@@ -1,0 +1,2 @@
+2026-11-19 14:48:07,724 - aqt.metadata - DEBUG - metadata 139922428766016 Connection to 'https://download.qt.io' failed. Retrying with fallback 'https://mirror.netcologne.de/qtproject/'.
+2026-11-19 14:48:12,413 - aqt.main - ERROR - installer 139922428766016 Failure to connect to https://mirror.netcologne.de/qtproject/online/qtsdkrepository/linux_x64/android/: ProxyError
