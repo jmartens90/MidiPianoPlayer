@@ -14,14 +14,21 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Install Qt for Android (and the matching desktop Qt for the host tools)
+      - name: Install desktop Qt (host tools for the Android build)
         uses: jurplel/install-qt-action@v4
         with:
           version: '6.8.3'
           host: linux
+          target: desktop
+          arch: linux_gcc_64
+          cache: true
+      - name: Install Qt for Android
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          host: all_os
           target: android
           arch: android_arm64_v8a
-          autodesktop: true
           cache: true
       - name: Install Android NDK r26b (the version Qt 6.8 is built with)
         run: |
