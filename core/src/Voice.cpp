@@ -29,11 +29,8 @@ void Voice::release() {
 
 float Voice::render(float sampleRate) {
   if (!isActive()) return 0.0f;
-  // Vereiste 5: 5.useful and correct polymorphism (explain why)
-  // oscillator_ is een Oscillator*, maar wijst naar een Sine-, Saw-, Square- of TriangleOscillator.
-  // next() roept de virtuele sample() op, en C++ kiest tijdens het draaien de juiste golfvorm.
-  // Voice hoeft dus niet te weten welke golfvorm de gebruiker koos, en kan er tijdens het spelen
-  // van wisselen.
+  // oscillator_ wijst naar een Sine-, Saw-, Square- of TriangleOscillator; next() roept de virtuele
+  // sample() op, dus Voice hoeft niet te weten welke golfvorm de gebruiker koos.
   const float raw = oscillator_->next(frequencyHz_, sampleRate);
   return filter_.process(raw, sampleRate) * envelope_.next(sampleRate) * gain_;
 }

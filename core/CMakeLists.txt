@@ -9,10 +9,12 @@ add_library(midipiano_core STATIC
   src/PresetStore.cpp
   src/Synth.cpp
   src/Voice.cpp
+  src/SoundFont.cpp
+  src/VoiceSynth.cpp
   src/Waveforms.cpp
 )
 target_include_directories(midipiano_core PUBLIC include)
-target_link_libraries(midipiano_core PUBLIC miniaudio)
+target_link_libraries(midipiano_core PUBLIC miniaudio tinysoundfont)
 target_compile_features(midipiano_core PUBLIC cxx_std_17)
 if(MSVC)
   target_compile_options(midipiano_core PRIVATE /W4)

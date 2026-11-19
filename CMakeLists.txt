@@ -12,6 +12,7 @@ if(ANDROID)
 endif()
 
 add_subdirectory(third_party/miniaudio)
+add_subdirectory(third_party/tinysoundfont)
 add_subdirectory(core)
 
 if(MIDIPIANO_BUILD_TESTS)

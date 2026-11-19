@@ -1,10 +1,9 @@
 import QtQuick
 import QtQuick.Controls
-import QtQuick.Layouts
 
 // Een draaiknop voor een synth-parameter. Met logarithmic: true werkt de knop in octaven,
 // zodat bv. de cutoff tussen 100 Hz en 1 kHz even veel draaibereik krijgt als tussen 1 en 10 kHz.
-ColumnLayout {
+Item {
     id: root
 
     property var synth
@@ -15,9 +14,11 @@ ColumnLayout {
     property bool logarithmic: false
     property string unit: ""
     property int decimals: 2
-    property int dialSize: 62
+    property int dialSize: 58
+    property bool compact: false
 
-    spacing: 0
+    implicitWidth: 66
+    implicitHeight: column.implicitHeight
 
     function toParam(position) {
         return logarithmic ? from * Math.pow(to / from, position) : from + (to - from) * position
@@ -36,27 +37,46 @@ ColumnLayout {
         dial.value = toPosition(synth.param(paramName))
     }
 
-    Dial {
-        id: dial
-        Layout.preferredWidth: root.dialSize
-        Layout.preferredHeight: root.dialSize
-        Layout.alignment: Qt.AlignHCenter
-        from: 0
-        to: 1
-        inputMode: Dial.Vertical
-        onMoved: root.synth.setParam(root.paramName, root.toParam(value))
-        Component.onCompleted: root.reload()
-    }
-    Label {
-        Layout.alignment: Qt.AlignHCenter
-        text: root.label
-        font.pixelSize: 12
-        opacity: 0.75
-    }
-    Label {
-        Layout.alignment: Qt.AlignHCenter
-        text: root.formatted(root.toParam(dial.value))
-        font.pixelSize: 12
+    Column {
+        id: column
+        width: parent.width
+        spacing: 0
+
+        // De Material-stijl tekent een Dial nooit kleiner dan 64 px, dus kleinere knoppen schalen we.
+        Item {
+            width: root.dialSize
+            height: root.dialSize
+            anchors.horizontalCenter: parent.horizontalCenter
+
+        Dial {
+            id: dial
+            width: 64
+            height: 64
+            anchors.centerIn: parent
+            scale: root.dialSize / 64
+            from: 0
+            to: 1
+            inputMode: Dial.Vertical
+            focusPolicy: Qt.NoFocus
+            onMoved: root.synth.setParam(root.paramName, root.toParam(value))
+            Component.onCompleted: root.reload()
+        }
+        }
+        Label {
+            width: parent.width
+            horizontalAlignment: Text.AlignHCenter
+            text: root.label
+            font.pixelSize: root.compact ? 10 : 12
+            opacity: 0.75
+            elide: Text.ElideRight
+        }
+        Label {
+            width: parent.width
+            horizontalAlignment: Text.AlignHCenter
+            text: root.formatted(root.toParam(dial.value))
+            font.pixelSize: root.compact ? 10 : 12
+            elide: Text.ElideRight
+        }
     }
 
     Connections {

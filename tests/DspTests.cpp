@@ -11,6 +11,7 @@
 #include "TestFramework.h"
 #include "midipiano/dsp/Envelope.h"
 #include "midipiano/dsp/Synth.h"
+#include "midipiano/dsp/VoiceSynth.h"
 #include "midipiano/dsp/Waveforms.h"
 #include "midipiano/util/MathUtil.h"
 #include "midipiano/util/RingBuffer.h"
@@ -82,7 +83,7 @@ TEST(synth_allocates_and_steals_voices) {
   CHECK(synth.activeVoiceCount() == 1);
   for (std::uint8_t n = 61; n < 61 + 10; ++n) synth.noteOn(n);  // 11 noten, maar 8 stemmen
   synth.render(buffer);
-  CHECK(synth.activeVoiceCount() == dsp::Synth::kMaxVoices);
+  CHECK(synth.activeVoiceCount() == dsp::VoiceSynth::kMaxVoices);
 }
 
 TEST(synth_goes_silent_after_note_off) {

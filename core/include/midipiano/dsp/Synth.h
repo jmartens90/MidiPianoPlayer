@@ -1,13 +1,14 @@
 #ifndef MIDIPIANO_DSP_SYNTH_H
 #define MIDIPIANO_DSP_SYNTH_H
 
-#include <array>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <mutex>
+#include <string>
 #include <vector>
 
-#include "midipiano/dsp/Voice.h"
+#include "midipiano/dsp/Instrument.h"
 #include "midipiano/midi/MidiMessage.h"
 #include "midipiano/preset/Patch.h"
 #include "midipiano/util/RingBuffer.h"
@@ -15,16 +16,16 @@
 namespace midipiano::dsp {
 
 // Vereiste 2: 2.useful and correct abstraction (explain why)
-// Synth verbergt alles wat nodig is om een noot te laten klinken (8 voices, stemtoewijzing,
-// envelopes, filter, volume, de lock tussen threads). De rest van het programma kent alleen
-// noteOn(), noteOff(), handle(MidiMessage) en render(). Het toetsenbord, de demo-sequencer en
-// straks BLE-MIDI moeten dus niets weten van voices of samples.
+// Synth verbergt alles wat nodig is om een noot te laten klinken: welke instrumenten er zijn
+// (de synth of een piano uit samples), welk er gekozen is, de mix, het volume, de oscilloscoop en
+// de lock tussen threads. De rest van het programma kent alleen noteOn(), noteOff(),
+// handle(MidiMessage) en render(). Het toetsenbord, de demo-sequencer en straks BLE-MIDI moeten dus
+// niets weten van stemmen, samples of TinySoundFont.
 //
 // Thread-veilig: noteOn/noteOff/applyPatch komen van de GUI- of sequencer-thread, render() van de
 // audio-thread. Een mutex beschermt de gedeelde toestand.
 class Synth {
  public:
-  static constexpr std::size_t kMaxVoices = 8;
   static constexpr std::size_t kScopeSize = 1024;
 
   explicit Synth(float sampleRate = 48000.0f);
@@ -44,6 +45,12 @@ class Synth {
   void setSampleRate(float sampleRate);
   float sampleRate() const;
 
+  std::size_t addInstrument(std::unique_ptr<Instrument> instrument);
+  void selectInstrument(std::size_t index);
+  std::size_t currentInstrument() const;
+  std::vector<std::string> instrumentNames() const;
+  bool currentUsesPatch() const;
+
   void applyPatch(const preset::Patch& patch);
   preset::Patch patch() const;
 
@@ -51,19 +58,12 @@ class Synth {
   std::size_t activeVoiceCount() const;
 
  private:
-  Voice* findFreeVoice();
-  Voice& oldestVoice();
-  void applyPatchToVoice(Voice& voice);
-
   mutable std::mutex mutex_;
-
-  // Vereiste 45: 45.useful container class
-  // std::array<Voice, 8>: het aantal stemmen staat vast, dus geen vector die tijdens het spelen
-  // kan herallocaten (dat zou in de audio-thread een hapering geven). Zie ook std::map in Patch.
-  std::array<Voice, kMaxVoices> voices_;
+  std::vector<std::unique_ptr<Instrument>> instruments_;
+  std::size_t current_ = 0;
   preset::Patch patch_;
   float sampleRate_;
-  std::uint64_t clock_ = 0;
+  std::vector<float> scratch_;
   util::RingBuffer<float> scope_{kScopeSize};
 };
 

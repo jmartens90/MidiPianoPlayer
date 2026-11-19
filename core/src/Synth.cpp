@@ -3,10 +3,13 @@
 #include <algorithm>
 #include <cmath>
 
+#include "midipiano/dsp/VoiceSynth.h"
+
 namespace midipiano::dsp {
 
 Synth::Synth(float sampleRate) : sampleRate_(sampleRate) {
-  for (Voice& voice : voices_) applyPatchToVoice(voice);
+  instruments_.push_back(std::make_unique<VoiceSynth>(sampleRate));  // instrument 0: de synth
+  scratch_.resize(4096);
 }
 
 void Synth::handle(const midi::MidiMessage& message) {
@@ -19,38 +22,40 @@ void Synth::handle(const midi::MidiMessage& message) {
   }
 }
 
-// Vereiste 29: 29.useful member function
-// noteOn() is het hart van de polyfonie: het zoekt een vrije stem, en als alle 8 bezet zijn, neemt
-// het de oudste (voice stealing). Zo kan je akkoorden spelen en blijft een nieuwe noot altijd hoorbaar.
 void Synth::noteOn(std::uint8_t note, std::uint8_t velocity) {
   std::lock_guard<std::mutex> lock(mutex_);
-  Voice* voice = findFreeVoice();
-  if (voice == nullptr) voice = &oldestVoice();
-  voice->start(note, velocity, ++clock_);
+  instruments_[current_]->noteOn(note, velocity);
 }
 
 void Synth::noteOff(std::uint8_t note) {
   std::lock_guard<std::mutex> lock(mutex_);
-  for (Voice& voice : voices_) {
-    if (voice.isHeld() && voice.note() == note) voice.release();
-  }
+  // Aan alle instrumenten: een noot die nog op het vorige instrument werd gestart, moet ook stoppen.
+  for (const auto& instrument : instruments_) instrument->noteOff(note);
 }
 
 void Synth::allNotesOff() {
   std::lock_guard<std::mutex> lock(mutex_);
-  for (Voice& voice : voices_) voice.release();
+  for (const auto& instrument : instruments_) instrument->allNotesOff();
 }
 
 void Synth::render(float* out, std::size_t frames) {
   std::lock_guard<std::mutex> lock(mutex_);
+  if (scratch_.size() < frames) scratch_.resize(frames);  // gebeurt hooguit een keer
+  std::fill(out, out + frames, 0.0f);
+  // Vereiste 5: 5.useful and correct polymorphism (explain why)
+  // instruments_ bevat zowel de VoiceSynth als SoundFontInstruments (piano, orgel, ...), allemaal
+  // via een Instrument-pointer. render() roept bij elk dezelfde virtuele functie op en C++ kiest
+  // tijdens het draaien de juiste: golfvormen berekenen of samples afspelen. Zo klinkt een losgelaten
+  // pianonoot ook nog uit als je intussen naar de synth overschakelt.
+  for (const auto& instrument : instruments_) {
+    if (instrument->activeVoiceCount() == 0) continue;
+    instrument->render(scratch_.data(), frames);
+    for (std::size_t i = 0; i < frames; ++i) out[i] += scratch_[i];
+  }
   const float volume = patch_.get("volume");
   for (std::size_t i = 0; i < frames; ++i) {
-    float mix = 0.0f;
-    for (Voice& voice : voices_) mix += voice.render(sampleRate_);
-    // Zachte begrenzing zodat een akkoord van 8 noten niet clipt.
-    const float sample = std::tanh(mix * volume * 0.6f);
-    out[i] = sample;
-    scope_.push(sample);
+    out[i] = std::tanh(out[i] * volume);  // zachte begrenzing: een vol akkoord clipt niet
+    scope_.push(out[i]);
   }
 }
 
@@ -67,6 +72,7 @@ void Synth::scopeSnapshot(std::vector<float>& out) const {
 void Synth::setSampleRate(float sampleRate) {
   std::lock_guard<std::mutex> lock(mutex_);
   sampleRate_ = sampleRate;
+  for (const auto& instrument : instruments_) instrument->setSampleRate(sampleRate);
 }
 
 float Synth::sampleRate() const {
@@ -74,10 +80,43 @@ float Synth::sampleRate() const {
   return sampleRate_;
 }
 
+std::size_t Synth::addInstrument(std::unique_ptr<Instrument> instrument) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  instrument->setSampleRate(sampleRate_);
+  instrument->applyPatch(patch_);
+  instruments_.push_back(std::move(instrument));
+  return instruments_.size() - 1;
+}
+
+void Synth::selectInstrument(std::size_t index) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (index < instruments_.size()) current_ = index;
+}
+
+std::size_t Synth::currentInstrument() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return current_;
+}
+
+std::vector<std::string> Synth::instrumentNames() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  std::vector<std::string> names;
+  for (const auto& instrument : instruments_) names.push_back(instrument->name());
+  return names;
+}
+
+bool Synth::currentUsesPatch() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return instruments_[current_]->usesPatch();
+}
+
 void Synth::applyPatch(const preset::Patch& patch) {
   std::lock_guard<std::mutex> lock(mutex_);
   patch_ = patch;
-  for (Voice& voice : voices_) applyPatchToVoice(voice);
+  // Vereiste 38: 38.at least 4 useful const references for variables (1/4)
+  // instrument is een const-referentie naar elke unique_ptr in de vector: een unique_ptr kan je niet
+  // kopieren, en const garandeert dat we de lijst zelf hier niet wijzigen.
+  for (const auto& instrument : instruments_) instrument->applyPatch(patch_);
 }
 
 preset::Patch Synth::patch() const {
@@ -87,37 +126,9 @@ preset::Patch Synth::patch() const {
 
 std::size_t Synth::activeVoiceCount() const {
   std::lock_guard<std::mutex> lock(mutex_);
-  return static_cast<std::size_t>(
-      std::count_if(voices_.begin(), voices_.end(), [](const Voice& v) { return v.isActive(); }));
-}
-
-// Vereiste 46: 46.useful usage of nullptr
-// findFreeVoice() geeft nullptr terug als alle 8 stemmen bezig zijn. noteOn() test daarop en kiest
-// dan de oudste stem. Zo betekent nullptr duidelijk "geen vrije stem" in plaats van een magisch getal.
-Voice* Synth::findFreeVoice() {
-  for (Voice& voice : voices_) {
-    if (!voice.isActive()) return &voice;
-  }
-  return nullptr;
-}
-
-Voice& Synth::oldestVoice() {
-  return *std::min_element(voices_.begin(), voices_.end(), [](const Voice& a, const Voice& b) {
-    return a.startedAt() < b.startedAt();
-  });
-}
-
-void Synth::applyPatchToVoice(Voice& voice) {
-  // Vereiste 38: 38.at least 4 useful const references for variables (1/4)
-  // p is een const-referentie naar patch_: kortere code zonder de hele Patch (met zijn std::map) te
-  // kopieren, en const garandeert dat we de patch hier niet per ongeluk wijzigen.
-  const preset::Patch& p = patch_;
-  voice.setWaveform(p.waveform());
-  voice.envelope().setAttack(p.get("attack"));
-  voice.envelope().setDecay(p.get("decay"));
-  voice.envelope().setSustain(p.get("sustain"));
-  voice.envelope().setRelease(p.get("release"));
-  voice.filter().setCutoff(p.get("cutoff"));
+  std::size_t count = 0;
+  for (const auto& instrument : instruments_) count += instrument->activeVoiceCount();
+  return count;
 }
 
 }  // namespace midipiano::dsp

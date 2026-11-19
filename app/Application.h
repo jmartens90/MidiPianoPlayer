@@ -13,6 +13,8 @@ class Application {
   int run();
 
  private:
+  void lockLandscape();
+
   QGuiApplication app_;
   QQmlApplicationEngine engine_;
 };

@@ -9,17 +9,20 @@ the same kind of pattern.
 
 ## Features
 
-* 8-voice polyphony with voice stealing: play chords with up to 10 fingers.
-* Four waveforms (sine, saw, square, triangle), an ADSR envelope and a low-pass filter per voice.
+* A sampled **Grand Piano** and 7 more sampled instruments (Bright Grand, Tine and FM electric piano,
+  Vibraphone, Pipe Organ, Strings, Warm Pad), played from a SoundFont with
+  [TinySoundFont](https://github.com/schellingb/TinySoundFont).
+* A built-in synth: 8 voices with voice stealing, four waveforms (sine, saw, square, triangle), an ADSR
+  envelope and a low-pass filter per voice.
 * A multitouch keyboard: slide over the keys (glissando), and touch lower on a key to play louder.
   On a PC you can also play with the mouse or the computer keyboard (`A W S E D F T G Y H U J K`).
 * A live oscilloscope drawn with OpenGL.
 * Presets saved as text files, with four factory presets (Soft Pad, Square Lead, Pluck, Sine Organ).
 * A demo sequencer running on its own thread. Its notes light up on the keyboard.
 * Low-latency audio through [miniaudio](https://miniaud.io): WASAPI, Core Audio, PulseAudio/ALSA or AAudio.
-* The layout adapts from a wide PC window to a phone in portrait.
+* On Android the app runs fullscreen in landscape, with a compact control bar so the keyboard gets the most room.
 
-<img src="docs/images/phone-portrait.png" width="260" alt="Phone layout">
+![Phone, landscape](docs/images/phone-landscape.png)
 
 <!-- Vereiste 20: 20.working build manual as readme on GitHub (project must be possible to build from scratch on a clean PC) -->
 ## Build manual
@@ -77,12 +80,13 @@ Only the app is built for Android. The unit tests run on the PC.
 | Control | What it does |
 |---|---|
 | Keys | Touch, click or type to play. Several fingers = a chord. Slide = glissando. Low on a key = louder |
-| Waveform | Sine (soft), Saw (bright), Square (hollow), Triangle (mellow) |
-| Attack / Decay / Sustain / Release | How a note fades in, drops to its held level, and rings out |
-| Cutoff | Low-pass filter: lower = darker sound |
+| Instrument | Grand Piano and the other sampled instruments, or "Synth" for the built-in synth |
+| Waveform | (Synth only) Sine (soft), Saw (bright), Square (hollow), Triangle (mellow) |
+| Attack / Decay / Sustain / Release | (Synth only) How a note fades in, drops to its held level, and rings out |
+| Cutoff | (Synth only) Low-pass filter: lower = darker sound |
 | Volume | Master volume |
 | Octave − / + | Shift the keyboard from C0 to C6 |
-| Preset list / Save | Load a preset, or save the current sound under a name |
+| Preset list / Save | (Synth only) Load a preset, or save the current synth sound under a name |
 | Play demo | Starts the demo sequencer (an Am - F - C - G arpeggio) |
 
 Presets are plain text files in the app's data folder, for example
@@ -93,12 +97,14 @@ Presets are plain text files in the app's data folder, for example
 
 | Folder | Contents |
 |---|---|
-| `core/` | The synth without Qt: `dsp` (oscillators, envelope, filter, voice, synth), `midi` (messages, sources, demo sequencer), `preset` (patches, files), `audio` (sound card), `util` |
+| `core/` | The sound engine without Qt: `dsp` (instruments, SoundFont, oscillators, envelope, filter, voice, synth), `midi` (messages, sources, demo sequencer), `preset` (patches, files), `audio` (sound card), `util` |
 | `app/` | The Qt Quick app: `Application`, `SynthController`, `WaveformView` (OpenGL) and the QML files |
 | `tests/` | Unit tests for `core/` |
 | `docs/` | [Test plan](docs/TESTPLAN.md) and screenshots |
 | `tools/` | `check_vereisten.py`, which checks that every requirement is marked in the code |
+| `assets/soundfonts/` | `instruments.sf2`: 8 presets cut from [GeneralUser GS](https://www.schristiancollins.com/generaluser) v2.0.3 by S. Christian Collins ([license](assets/soundfonts/GeneralUser-GS-LICENSE.txt)) |
 | `third_party/miniaudio/` | [miniaudio](https://github.com/mackron/miniaudio) 0.11.26 (public domain / MIT-0) |
+| `third_party/tinysoundfont/` | [TinySoundFont](https://github.com/schellingb/TinySoundFont) (MIT) |
 
 <!-- Vereiste 1: 1.UML diagram of the entire planned project -->
 ## UML class diagram
@@ -141,8 +147,32 @@ classDiagram
         +synchronize(item)
         +render()
     }
-    class Synth {
+    class Instrument {
+        <<abstract>>
+        +noteOn(note, velocity)*
+        +noteOff(note)*
+        +render(out, frames)*
+        +activeVoiceCount()* size_t
+        +usesPatch() bool
+    }
+    class VoiceSynth {
         -array~Voice, 8~ voices_
+        +noteOn(note, velocity)
+        -findFreeVoice() Voice*
+    }
+    class SoundFont {
+        -tsf* font_
+        +fromFile(path)$ shared_ptr~SoundFont~
+        +fromMemory(bytes)$ shared_ptr~SoundFont~
+        +presetName(i) string
+    }
+    class SoundFontInstrument {
+        -shared_ptr~SoundFont~ font_
+        -tsf* voices_
+        +~SoundFontInstrument()
+    }
+    class Synth {
+        -vector~unique_ptr~Instrument~~ instruments_
         -Patch patch_
         -mutex mutex_
         -RingBuffer~float~ scope_
@@ -150,8 +180,9 @@ classDiagram
         +noteOn(note, velocity = 100)
         +noteOff(note)
         +render(vector~float~&)
+        +addInstrument(unique_ptr~Instrument~)
+        +selectInstrument(index)
         +applyPatch(const Patch&)
-        -findFreeVoice() Voice*
     }
     class Voice {
         -unique_ptr~Oscillator~ oscillator_
@@ -257,10 +288,15 @@ classDiagram
     WaveformView ..> SynthController : scopeUpdated()
     WaveformView ..> ScopeRenderer : creates
     AudioOutput ..> Synth : render() on audio thread
-    Synth *-- "8" Voice
+    Synth *-- "1..*" Instrument
+    Instrument <|-- VoiceSynth
+    Instrument <|-- SoundFontInstrument
+    VoiceSynth *-- "8" Voice
+    SoundFontInstrument o-- SoundFont : shared
     Synth *-- Patch
     Synth *-- RingBuffer
     Synth ..> MidiMessage : handle()
+    SynthController ..> SoundFont : loads instruments.sf2
     Voice *-- Oscillator
     Voice *-- Envelope
     Voice *-- LowPassFilter
@@ -288,7 +324,7 @@ concrete explanation. Search for it with Ctrl+F, or run `python3 tools/check_ver
 | 2 | useful and correct abstraction (explain why) | [`core/include/midipiano/dsp/Synth.h`](core/include/midipiano/dsp/Synth.h) |
 | 3 | useful and correct encapsulation (explain why) | [`core/include/midipiano/preset/Param.h`](core/include/midipiano/preset/Param.h) |
 | 4 | useful and correct inheritance (explain why) | [`core/include/midipiano/dsp/Waveforms.h`](core/include/midipiano/dsp/Waveforms.h) |
-| 5 | useful and correct polymorphism (explain why) | [`core/src/Voice.cpp`](core/src/Voice.cpp) |
+| 5 | useful and correct polymorphism (explain why) | [`core/src/Synth.cpp`](core/src/Synth.cpp) |
 | 6 | useful and correct object composition (explain why) | [`core/include/midipiano/dsp/Voice.h`](core/include/midipiano/dsp/Voice.h) |
 | 7 | useful and correct base class | [`core/include/midipiano/dsp/Oscillator.h`](core/include/midipiano/dsp/Oscillator.h) |
 | 8 | useful and correct abstract base class | [`core/include/midipiano/midi/MidiSource.h`](core/include/midipiano/midi/MidiSource.h) |
@@ -312,7 +348,7 @@ concrete explanation. Search for it with Ctrl+F, or run `python3 tools/check_ver
 | 26 | constructor forwarding | [`core/include/midipiano/dsp/Envelope.h`](core/include/midipiano/dsp/Envelope.h) |
 | 27 | useful proven (dynamic) polymorphism | [`tests/DspTests.cpp`](tests/DspTests.cpp) |
 | 28 | useful usage of "this" (if the code does not work without it) | [`core/src/AudioOutput.cpp`](core/src/AudioOutput.cpp), [`core/src/Patch.cpp`](core/src/Patch.cpp) |
-| 29 | useful member function | [`core/src/Synth.cpp`](core/src/Synth.cpp) |
+| 29 | useful member function | [`core/src/VoiceSynth.cpp`](core/src/VoiceSynth.cpp) |
 | 30 | default values in function definition | [`core/include/midipiano/dsp/Synth.h`](core/include/midipiano/dsp/Synth.h) |
 | 31 | useful member variabel | [`core/include/midipiano/dsp/Voice.h`](core/include/midipiano/dsp/Voice.h) |
 | 32 | useful getters and setters for member variables | [`core/include/midipiano/preset/Param.h`](core/include/midipiano/preset/Param.h) |
@@ -323,13 +359,13 @@ concrete explanation. Search for it with Ctrl+F, or run `python3 tools/check_ver
 | 37 | 2 useful unsigned chars or other better usage of memory efficient type | [`core/include/midipiano/dsp/Waveforms.h`](core/include/midipiano/dsp/Waveforms.h), [`core/include/midipiano/midi/MidiMessage.h`](core/include/midipiano/midi/MidiMessage.h) |
 | 38 | at least 4 useful const references for variables | [`app/SynthController.cpp`](app/SynthController.cpp), [`core/src/DemoSequencer.cpp`](core/src/DemoSequencer.cpp), [`core/src/PresetStore.cpp`](core/src/PresetStore.cpp), [`core/src/Synth.cpp`](core/src/Synth.cpp) |
 | 39 | at least 4 useful const references for functions | [`core/src/PresetStore.cpp`](core/src/PresetStore.cpp) |
-| 40 | 2 useful and correct smart pointers | [`app/SynthController.h`](app/SynthController.h), [`core/include/midipiano/dsp/Voice.h`](core/include/midipiano/dsp/Voice.h) |
+| 40 | 2 useful and correct smart pointers | [`app/SynthController.h`](app/SynthController.h), [`core/include/midipiano/dsp/SoundFont.h`](core/include/midipiano/dsp/SoundFont.h), [`core/include/midipiano/dsp/Voice.h`](core/include/midipiano/dsp/Voice.h) |
 | 41 | dynamic memory allocation (new) | [`core/include/midipiano/util/RingBuffer.h`](core/include/midipiano/util/RingBuffer.h) |
 | 42 | dynamic memory removing (delete or kill children) | [`core/include/midipiano/util/RingBuffer.h`](core/include/midipiano/util/RingBuffer.h) |
 | 43 | 2 useful (modern) call-by-references | [`core/src/Synth.cpp`](core/src/Synth.cpp) |
 | 44 | useful string class usage (c++ functionality) | [`core/src/PresetStore.cpp`](core/src/PresetStore.cpp) |
-| 45 | useful container class | [`core/include/midipiano/dsp/Synth.h`](core/include/midipiano/dsp/Synth.h) |
-| 46 | useful usage of nullptr | [`core/src/Synth.cpp`](core/src/Synth.cpp) |
+| 45 | useful container class | [`core/include/midipiano/dsp/VoiceSynth.h`](core/include/midipiano/dsp/VoiceSynth.h) |
+| 46 | useful usage of nullptr | [`core/src/VoiceSynth.cpp`](core/src/VoiceSynth.cpp) |
 | 47 | useful usage of (modern) file-I/O | [`core/src/PresetStore.cpp`](core/src/PresetStore.cpp) |
 | 48 | useful exception handling | [`core/src/PresetStore.cpp`](core/src/PresetStore.cpp) |
 | 49 | useful usage of a lambda function | [`app/SynthController.cpp`](app/SynthController.cpp) |

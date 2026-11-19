@@ -32,6 +32,9 @@ class SynthController : public QObject {
   Q_PROPERTY(bool sequencerRunning READ sequencerRunning NOTIFY sequencerRunningChanged)
   Q_PROPERTY(int activeVoices READ activeVoices NOTIFY activeVoicesChanged)
   Q_PROPERTY(QString statusText READ statusText NOTIFY statusTextChanged)
+  Q_PROPERTY(int instrument READ instrument WRITE setInstrument NOTIFY instrumentChanged)
+  Q_PROPERTY(QStringList instrumentNames READ instrumentNames CONSTANT)
+  Q_PROPERTY(bool synthControlsEnabled READ synthControlsEnabled NOTIFY instrumentChanged)
 
  public:
   explicit SynthController(QObject* parent = nullptr);
@@ -54,6 +57,10 @@ class SynthController : public QObject {
   bool sequencerRunning() const;
   int activeVoices() const { return activeVoices_; }
   QString statusText() const { return statusText_; }
+  int instrument() const { return static_cast<int>(synth_.currentInstrument()); }
+  void setInstrument(int index);
+  QStringList instrumentNames() const { return instrumentNames_; }
+  bool synthControlsEnabled() const { return synth_.currentUsesPatch(); }
 
   void copyScope(std::vector<float>& out) const { synth_.scopeSnapshot(out); }
 
@@ -63,6 +70,7 @@ class SynthController : public QObject {
   void sequencerRunningChanged();
   void activeVoicesChanged();
   void statusTextChanged();
+  void instrumentChanged();
   void noteStateChanged(int note, bool on);  // noten van de sequencer, om toetsen te laten oplichten
   void scopeUpdated();
 
@@ -72,6 +80,7 @@ class SynthController : public QObject {
  private:
   void onSourceMessage(const midi::MidiMessage& message);
   void refreshPresets();
+  void loadSoundFont();
   void setStatus(const QString& text);
 
   dsp::Synth synth_;  // als eerste gedeclareerd, dus als laatste vernietigd (audio_ gebruikt hem)
@@ -85,6 +94,7 @@ class SynthController : public QObject {
   QTimer* tick_;
   QString patchName_ = "Init";
   QStringList presets_;
+  QStringList instrumentNames_;
   QString statusText_;
   int activeVoices_ = 0;
 };

@@ -1,11 +1,13 @@
 #include "SynthController.h"
 
+#include <QFile>
 #include <QMetaObject>
 #include <QStandardPaths>
 
 #include <algorithm>
 #include <exception>
 
+#include "midipiano/dsp/SoundFont.h"
 #include "midipiano/midi/DemoSequencer.h"
 
 namespace midipiano::app {
@@ -23,6 +25,8 @@ SynthController::SynthController(QObject* parent)
   } catch (const audio::AudioError& e) {
     setStatus(QStringLiteral("No sound: %1").arg(QString::fromUtf8(e.what())));
   }
+
+  loadSoundFont();
 
   try {
     const QString dir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/presets";
@@ -44,6 +48,30 @@ SynthController::SynthController(QObject* parent)
 
 SynthController::~SynthController() {
   if (source_) source_->stop();  // eerst de sequencer-thread stoppen, dan pas de synth afbreken
+}
+
+void SynthController::loadSoundFont() {
+  // De pianosamples zitten als Qt-resource in de app (ook in de APK), dus we lezen ze met QFile en
+  // geven de bytes aan de Qt-vrije core.
+  QFile file(QStringLiteral(":/sounds/instruments.sf2"));
+  try {
+    if (!file.open(QIODevice::ReadOnly)) throw dsp::SoundFontError("instruments.sf2 ontbreekt in de app");
+    const QByteArray bytes = file.readAll();
+    const auto font = dsp::SoundFont::fromMemory(std::vector<char>(bytes.begin(), bytes.end()));
+    for (int i = 0; i < font->presetCount(); ++i) {
+      synth_.addInstrument(std::make_unique<dsp::SoundFontInstrument>(font, i, synth_.sampleRate()));
+    }
+    if (font->presetCount() > 0) synth_.selectInstrument(1);  // 0 = Synth, 1 = Grand Piano
+  } catch (const dsp::SoundFontError& e) {
+    setStatus(QStringLiteral("Piano samples unavailable: %1").arg(QString::fromUtf8(e.what())));
+  }
+  for (const std::string& name : synth_.instrumentNames()) instrumentNames_ << QString::fromStdString(name);
+}
+
+void SynthController::setInstrument(int index) {
+  if (index < 0 || index >= instrumentNames_.size() || index == instrument()) return;
+  synth_.selectInstrument(static_cast<std::size_t>(index));
+  emit instrumentChanged();
 }
 
 void SynthController::noteOn(int note, int velocity) { synth_.noteOn(toMidiByte(note), toMidiByte(velocity)); }

@@ -11,6 +11,7 @@ namespace midipiano::audio {
 // PulseAudio/ALSA op Linux, AAudio op Android) met dezelfde code. We openen een playback-apparaat met
 // lage latency, laten miniaudio de samplerate kiezen, en miniaudio roept vanaf zijn eigen
 // audio-thread dataCallback() op telkens de geluidskaart een nieuw blok samples nodig heeft.
+// Een tweede externe bibliotheek, TinySoundFont, speelt de pianosamples af (zie SoundFont.cpp).
 AudioOutput::AudioOutput(dsp::Synth& synth) : synth_(synth), device_(std::make_unique<ma_device>()) {
   ma_device_config config = ma_device_config_init(ma_device_type_playback);
   config.playback.format = ma_format_f32;

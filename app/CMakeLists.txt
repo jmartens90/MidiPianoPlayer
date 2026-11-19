@@ -29,6 +29,13 @@ qt_add_qml_module(MidiPianoPlayer
     WaveformView.cpp
 )
 
+# De pianosamples (6 MB) worden als Qt-resource in de app gebakken, zodat ze ook in de APK zitten.
+qt_add_resources(MidiPianoPlayer "soundfonts"
+  PREFIX "/sounds"
+  BASE "${PROJECT_SOURCE_DIR}/assets/soundfonts"
+  FILES "${PROJECT_SOURCE_DIR}/assets/soundfonts/instruments.sf2"
+)
+
 target_link_libraries(MidiPianoPlayer PRIVATE
   midipiano_core
   Qt6::Gui
