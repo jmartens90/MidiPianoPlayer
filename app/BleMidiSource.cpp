@@ -86,7 +86,9 @@ void BleMidiSource::startScan() {
   // Android 12+ (en macOS) vragen de gebruiker toestemming voor Bluetooth. Qt regelt de vraag; als
   // het antwoord binnenkomt, proberen we opnieuw.
   QBluetoothPermission permission;
-  permission.setCommunicationModes(QBluetoothPermission::Access);
+#if QT_VERSION >= QT_VERSION_CHECK(6, 6, 0)
+  permission.setCommunicationModes(QBluetoothPermission::Access);  // alleen verbinden, niet adverteren
+#endif
   switch (qApp->checkPermission(permission)) {
     case Qt::PermissionStatus::Undetermined:
       qApp->requestPermission(permission, this, [this](const QPermission& result) {
