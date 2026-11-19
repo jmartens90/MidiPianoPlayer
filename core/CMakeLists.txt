@@ -24,9 +24,12 @@ else()
   target_compile_options(midipiano_core PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
-# De wavetables worden bij het opstarten berekend (FFT). In een Debug-build duurt dat zonder
-# optimalisatie merkbaar lang, dus deze twee bestanden altijd met -O2 (niet voor MSVC: /O2 botst daar
-# met de Debug-controles).
+# De geluidsmotor moet elke paar milliseconden een blok audio afleveren, anders kraakt het. In een
+# Debug-build (de standaard in Qt Creator, ook voor Android) zou alles zonder optimalisatie draaien
+# en is een gsm daar te traag voor. Daarom altijd -O2 voor de motor en de twee C-bibliotheken
+# (debuggen kan nog steeds: -g blijft staan). Niet voor MSVC: /O2 botst daar met de Debug-controles.
 if(NOT MSVC)
-  set_source_files_properties(src/Wavetable.cpp src/Waveforms.cpp PROPERTIES COMPILE_OPTIONS "-O2")
+  target_compile_options(midipiano_core PRIVATE -O2)
+  target_compile_options(tinysoundfont PRIVATE -O2)
+  target_compile_options(miniaudio PRIVATE -O2)
 endif()

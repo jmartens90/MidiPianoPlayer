@@ -36,9 +36,11 @@ float Voice::render(float sampleRate) {
   const float raw = oscillator_->next(frequencyHz_, sampleRate);
   const float level = envelope_.next(sampleRate);
   // Filter-envelope: de envelope opent de filter mee, tot 5 octaven boven de cutoff. Met veel
-  // resonantie geeft dat het typische "acid"-gekwaak.
-  const float cutoff = filter_.cutoff() * std::exp2(filterEnvAmount_ * 5.0f * level);
-  return filter_.process(raw, sampleRate, cutoff) * level * gain_;
+  // resonantie geeft dat het typische "acid"-gekwaak. Om de 16 samples is snel genoeg voor het oor
+  // en spaart een exp2() per sample uit.
+  if ((controlCounter_++ & 15u) == 0)
+    filter_.setModulatedCutoff(filter_.cutoff() * std::exp2(filterEnvAmount_ * 5.0f * level), sampleRate);
+  return filter_.process(raw, sampleRate) * level * gain_;
 }
 
 void Voice::setWaveform(Waveform waveform) {

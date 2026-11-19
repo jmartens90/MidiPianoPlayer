@@ -99,6 +99,9 @@ float Wavetable::read(float phase, float position, std::size_t mipLevel) const {
 }
 
 void WavetableOscillator::prepare(float frequencyHz, float sampleRate) {
+  if (frequencyHz == lastFrequency_ && sampleRate == lastSampleRate_) return;  // meestal: zelfde noot
+  lastFrequency_ = frequencyHz;
+  lastSampleRate_ = sampleRate;
   mipLevel_ = Wavetable::mipLevelFor(frequencyHz, sampleRate);
 }
 

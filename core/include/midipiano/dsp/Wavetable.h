@@ -58,6 +58,8 @@ class WavetableOscillator final : public Oscillator {
   std::shared_ptr<const Wavetable> table_;  // gedeeld door alle stemmen: 1x geheugen
   float position_ = 0.0f;
   std::size_t mipLevel_ = 0;
+  float lastFrequency_ = -1.0f;
+  float lastSampleRate_ = -1.0f;
 };
 
 }  // namespace midipiano::dsp

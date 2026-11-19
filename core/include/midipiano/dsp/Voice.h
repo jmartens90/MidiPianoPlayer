@@ -52,6 +52,7 @@ class Voice {
   std::uint8_t note_ = 0;
   float filterEnvAmount_ = 0.0f;
   float wavetablePosition_ = 0.0f;
+  std::uint32_t controlCounter_ = 0;
   Waveform waveform_;
   float gain_ = 0.0f;
   float frequencyHz_ = 0.0f;

@@ -18,6 +18,11 @@ AudioOutput::AudioOutput(dsp::Synth& synth) : synth_(synth), device_(std::make_u
   config.playback.channels = 1;
   config.sampleRate = 0;  // 0 = de eigen samplerate van de geluidskaart (meestal 48000)
   config.performanceProfile = ma_performance_profile_low_latency;
+#ifdef __ANDROID__
+  // Op een gsm mag de buffer iets groter zijn: 10 ms per blok geeft de CPU genoeg tijd voor een
+  // volle akkoord met galm, zonder te kraken. Merkbare vertraging is dat nog niet.
+  config.periodSizeInMilliseconds = 10;
+#endif
   config.dataCallback = &AudioOutput::dataCallback;
   // Vereiste 28: 28.useful usage of "this" (if the code does not work without it)
   // miniaudio is een C-bibliotheek: de callback is een gewone (statische) functie zonder object.
