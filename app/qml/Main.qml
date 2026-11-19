@@ -10,8 +10,9 @@ import MidiPiano
 // ...) of de eigen wavetable-synth (tien golfvormen, morphen met Position) met draaiknoppen voor
 // ADSR, een resonante filter met drive en filter-envelope, en volume. Verder een instelbare galm, een
 // sustainpedaal, een live OpenGL-oscilloscoop, presets laden en opslaan, een demo-sequencer waarvan
-// de noten oplichten op het toetsenbord, en octaaf-knoppen. Op een gsm staat de app liggend, met een
-// compacte bovenbalk zodat het toetsenbord zo groot mogelijk is.
+// de noten oplichten op het toetsenbord, en octaaf-knoppen. Een instellingenpaneel zoekt en verbindt
+// Bluetooth-MIDI-toestellen (de PSoC 6); hun noten lichten ook op. Op een gsm staat de app liggend,
+// met een compacte bovenbalk zodat het toetsenbord zo groot mogelijk is.
 ApplicationWindow {
     id: window
 
@@ -115,11 +116,114 @@ ApplicationWindow {
                 Layout.preferredWidth: 22
                 horizontalAlignment: Text.AlignRight
             }
+            ToolButton {
+                // Instellingen: Bluetooth MIDI en audio-info. Het blauwe bolletje = Bluetooth verbonden.
+                text: "\u2699"
+                font.pixelSize: 22
+                focusPolicy: Qt.NoFocus
+                onClicked: settingsDrawer.open()
+                Rectangle {
+                    visible: synth.bluetooth.connected
+                    width: 8; height: 8; radius: 4
+                    color: "#4aa3ff"
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: 8
+                }
+            }
             Button {
                 text: synth.sequencerRunning ? qsTr("Stop demo") : qsTr("Play demo")
                 highlighted: synth.sequencerRunning
                 focusPolicy: Qt.NoFocus
                 onClicked: synth.toggleSequencer()
+            }
+        }
+    }
+
+    // Instellingen: schuift van rechts in beeld.
+    Drawer {
+        id: settingsDrawer
+        edge: Qt.RightEdge
+        width: Math.min(440, window.width * 0.6)
+        height: window.height
+        onClosed: keyboard.forceActiveFocus()
+
+        Flickable {
+            anchors.fill: parent
+            contentHeight: settingsColumn.implicitHeight + 32
+            clip: true
+
+            ColumnLayout {
+                id: settingsColumn
+                x: 16
+                y: 16
+                width: parent.width - 32
+                spacing: 10
+
+                Label { text: qsTr("Settings"); font.bold: true; font.pixelSize: 20 }
+
+                Label { text: qsTr("Bluetooth MIDI"); font.bold: true; font.pixelSize: 15; Layout.topMargin: 6 }
+                Label {
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    opacity: 0.75
+                    text: qsTr("Play the synth from a Bluetooth MIDI device, such as the PSoC 6 sequencer or a BLE keyboard.")
+                }
+                Label {
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    text: synth.bluetooth.statusText
+                    color: synth.bluetooth.connected ? "#4aa3ff" : "#f0b35a"
+                }
+                Label {
+                    visible: synth.bluetooth.connected
+                    text: qsTr("MIDI messages received: %1").arg(synth.bluetooth.messageCount)
+                    opacity: 0.75
+                }
+                RowLayout {
+                    spacing: 8
+                    visible: synth.bluetooth.available
+                    Button {
+                        text: synth.bluetooth.scanning ? qsTr("Stop search") : qsTr("Search devices")
+                        highlighted: !synth.bluetooth.connected
+                        focusPolicy: Qt.NoFocus
+                        onClicked: synth.bluetooth.scanning ? synth.bluetooth.stopScan() : synth.bluetooth.startScan()
+                    }
+                    Button {
+                        visible: synth.bluetooth.connected
+                        text: qsTr("Disconnect")
+                        focusPolicy: Qt.NoFocus
+                        onClicked: synth.bluetooth.disconnectDevice()
+                    }
+                    BusyIndicator {
+                        running: synth.bluetooth.scanning
+                        visible: running
+                        Layout.preferredWidth: 36
+                        Layout.preferredHeight: 36
+                    }
+                }
+                Repeater {
+                    model: synth.bluetooth.devices
+                    ItemDelegate {
+                        required property int index
+                        required property string modelData
+                        Layout.fillWidth: true
+                        text: modelData
+                        focusPolicy: Qt.NoFocus
+                        onClicked: synth.bluetooth.connectTo(index)
+                    }
+                }
+
+                Label { text: qsTr("Audio"); font.bold: true; font.pixelSize: 15; Layout.topMargin: 10 }
+                Label { text: synth.audioInfo; opacity: 0.75 }
+
+                Label { text: qsTr("Keyboard"); font.bold: true; font.pixelSize: 15; Layout.topMargin: 10 }
+                Label {
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    opacity: 0.75
+                    text: qsTr("On a computer: A W S E D F T G Y H U J K play the notes, hold Space for the sustain pedal.")
+                }
             }
         }
     }

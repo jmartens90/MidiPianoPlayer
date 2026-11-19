@@ -1,9 +1,9 @@
 # MidiPianoPlayer
 
 A polyphonic softsynth with a multitouch piano keyboard, written in C++17 with Qt Quick. The same code
-runs as a desktop app (Windows, macOS, Linux) and as an Android app. Later, a PSoC 6 MIDI sequencer
-will play it over Bluetooth LE MIDI. That's not in yet, so for now the built-in demo sequencer plays
-the same kind of pattern.
+runs as a desktop app (Windows, macOS, Linux) and as an Android app. A PSoC 6 MIDI sequencer (or any
+Bluetooth MIDI device) plays it over Bluetooth LE MIDI; without hardware, the built-in demo sequencer
+plays the same kind of pattern.
 
 ![Desktop](docs/images/desktop.png)
 
@@ -23,12 +23,15 @@ the same kind of pattern.
 * Presets saved as text files, with five factory presets (Soft Pad, Square Lead, Pluck, Sine Organ, Nasty Acid).
 * A demo sequencer running on its own thread. Its notes light up on the keyboard.
 * Low-latency audio through [miniaudio](https://miniaud.io): WASAPI, Core Audio, PulseAudio/ALSA or AAudio.
+* Bluetooth LE MIDI input: search and connect from the settings panel, then play from the PSoC 6 or any BLE MIDI device.
 * A sustain pedal (button, space bar or MIDI CC 64) and a Freeverb-style reverb that works on every instrument.
 * On Android the app always runs in landscape, with a compact control bar so the keyboard gets the most room.
 
 ![Phone, landscape](docs/images/phone-landscape.png)
 
 ![Reverb panel](docs/images/reverb-panel.png)
+
+![Settings with Bluetooth MIDI](docs/images/settings.png)
 
 <!-- Vereiste 20: 20.working build manual as readme on GitHub (project must be possible to build from scratch on a clean PC) -->
 ## Build manual
@@ -41,6 +44,8 @@ You need Qt 6.4 or newer (6.8 LTS recommended), CMake 3.16+ and a C++17 compiler
 1. Download the [Qt Online Installer](https://www.qt.io/download-qt-installer) and log in with a free Qt account.
 2. Choose **Custom installation** and tick:
    * **Qt → Qt 6.8.x → MinGW 13.1.0 64-bit** (and **Android** if you want the phone app, see below)
+   * **Qt → Qt 6.8.x → Additional Libraries → Qt Connectivity** (for Bluetooth MIDI; without it the
+     app still builds, only without Bluetooth)
    * **Developer and Designer Tools → Qt Creator, CMake, Ninja, MinGW 13.1.0 64-bit**
 3. Clone this repository (or download the ZIP from GitHub):
    `git clone https://github.com/jmartens90/MidiPianoPlayer.git`
@@ -53,7 +58,7 @@ You need Qt 6.4 or newer (6.8 LTS recommended), CMake 3.16+ and a C++17 compiler
 ### Linux (Ubuntu 24.04)
 
 ```
-sudo apt install git cmake g++ qt6-base-dev qt6-declarative-dev libgl-dev \
+sudo apt install git cmake g++ qt6-base-dev qt6-declarative-dev qt6-connectivity-dev libgl-dev \
                  qml6-module-qtquick-controls qml6-module-qtquick-layouts \
                  qml6-module-qtquick-window qml6-module-qtqml-workerscript qml6-module-qtquick-templates
 git clone https://github.com/jmartens90/MidiPianoPlayer.git
@@ -81,6 +86,24 @@ Installer. Then open `CMakeLists.txt` in Qt Creator and run it, the same way as 
 
 Only the app is built for Android. The unit tests run on the PC.
 
+## Bluetooth MIDI
+
+The app can be played from any Bluetooth LE MIDI device: the PSoC 6 sequencer of this project, a BLE
+MIDI keyboard, or a phone/PC app that sends BLE MIDI.
+
+1. Open **⚙ Settings** and tap **Search devices**. On Android the first time asks for Bluetooth
+   permission.
+2. Devices that advertise MIDI are at the top, marked **• MIDI**. Tap one to connect.
+3. Play on the device. Its notes play on the current instrument and light up on the keyboard;
+   CC 64 works as the sustain pedal.
+
+What the PSoC 6 (or any device) has to do: act as a BLE peripheral with the standard BLE MIDI
+service `03B80E5A-EDE8-4B33-A751-6CE34EC4C700` and the characteristic
+`7772E5DB-3868-4112-A1A9-F2669D106BF3` (read, write without response, notify), and send each MIDI
+message as a notification in the BLE MIDI packet format: `[header] [timestamp] [status] [data...]`.
+`BleMidiParser` (tested in `tests/BleMidiTests.cpp`, no hardware needed) handles running status,
+several messages per packet, realtime bytes and SysEx.
+
 ## Using the app
 
 | Control | What it does |
@@ -98,6 +121,7 @@ Only the app is built for Android. The unit tests run on the PC.
 | Volume | Master volume |
 | Pedal | Sustain pedal: released notes keep ringing until you turn it off. On a PC you can also hold the space bar |
 | Octave − / + | Shift the keyboard from C0 to C6 |
+| ⚙ (Settings) | Bluetooth MIDI (search, connect, disconnect), audio info and keyboard help. A blue dot means a Bluetooth device is connected |
 | Preset list / Save | (Synth only) Load a preset, or save the current synth sound under a name |
 | Play demo | Starts the demo sequencer (an Am - F - C - G arpeggio) |
 
@@ -121,8 +145,9 @@ Presets are plain text files in the app's data folder, for example
 <!-- Vereiste 1: 1.UML diagram of the entire planned project -->
 ## UML class diagram
 
-The whole planned project. `BleMidiSource` and the PSoC 6 sequencer are planned (dashed). They plug
-into the existing `MidiSource` interface, so nothing else has to change. A PNG version is in
+The whole project. `BleMidiSource` receives notes from the PSoC 6 sequencer (external hardware, not
+part of the C++ code) over Bluetooth LE and plugs into the same `MidiSource` interface as the demo
+sequencer. A PNG version is in
 [docs/images/uml.png](docs/images/uml.png).
 
 ```mermaid
@@ -280,12 +305,19 @@ classDiagram
         +~DemoSequencer()
     }
     class BleMidiSource {
-        <<planned>>
-        -QLowEnergyController
-        +start(Callback)
+        <<QObject>>
+        -QLowEnergyController* controller_
+        -BleMidiParser parser_
+        +startScan()
+        +connectTo(index)
+        +handlePacket(QByteArray)
+    }
+    class BleMidiParser {
+        -uint8_t runningStatus_
+        +parse(bytes, length) vector~MidiMessage~
     }
     class PSoC6Sequencer {
-        <<planned hardware>>
+        <<external hardware>>
         BLE MIDI peripheral
     }
     class Patch {
@@ -347,7 +379,10 @@ classDiagram
     WavetableOscillator o-- Wavetable
     OscillatorFactory ..> Oscillator : creates
     MidiSource <|-- DemoSequencer
-    MidiSource <|.. BleMidiSource
+    MidiSource <|-- BleMidiSource
+    BleMidiSource *-- BleMidiParser
+    BleMidiParser ..> MidiMessage : creates
+    SynthController *-- BleMidiSource
     BleMidiSource ..> PSoC6Sequencer : Bluetooth LE MIDI
     MidiSource ..> MidiMessage : sends
     Patch *-- Param
@@ -419,11 +454,10 @@ concrete explanation. Search for it with Ctrl+F, or run `python3 tools/check_ver
 | 56 | meaningful usage of a GUI (not just a screen that shows some text and a textfield) | [`app/qml/Main.qml`](app/qml/Main.qml) |
 | 57 | usage of OpenGL or other 3D engine | [`app/WaveformView.cpp`](app/WaveformView.cpp) |
 | 58 | useful (non trivial) usage of an external library (not Qt) | [`core/src/AudioOutput.cpp`](core/src/AudioOutput.cpp) |
-| 59 | project that communicates (e.g. UART, BT) with hardware | _planned: BLE MIDI from the PSoC 6_ |
+| 59 | project that communicates (e.g. UART, BT) with hardware | [`app/BleMidiSource.cpp`](app/BleMidiSource.cpp) |
 | 60 | a nice extra that you think that should deserve grading (stuff you put time in and is not rewarded by an item above) | [`app/CMakeLists.txt`](app/CMakeLists.txt) |
 
 ## Roadmap
 
-1. BLE MIDI: `BleMidiSource` with Qt Bluetooth, played by the PSoC 6 sequencer (requirement 59).
-2. Bug ticket on an issue branch, fixed by a pull request (requirement 54).
-3. Report a bug on another project (requirement 55).
+1. Bug ticket on an issue branch, fixed by a pull request (requirement 54).
+2. Report a bug on another project (requirement 55).

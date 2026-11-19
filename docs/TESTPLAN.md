@@ -24,6 +24,10 @@ them on every push.
 | Presets | `patch_clamps_and_chains`, `patch_copy_is_independent` | values stay in range, unknown names throw, copies are independent |
 | Files | `preset_round_trip`, `preset_errors_are_reported`, `factory_presets_are_installed_once` | save + load gives the same patch; missing, corrupt or unknown files give a `PresetError` |
 | Threads | `sequencer_works_through_base_class`, `sequencer_stops_quickly_even_when_slow` | the sequencer thread sends matching on/off pairs and stops within 200 ms |
+| Samples | `soundfont_loads_the_piano_presets`, `piano_plays_and_stops_through_the_synth`, `instruments_share_one_soundfont` | the SoundFont loads, the piano sounds and stops, instruments share one font |
+| Effects | `sustain_pedal_*`, `reverb_*`, `resonant_filter_rings_and_can_self_oscillate` | pedal holds notes, reverb tail and predelay, filter self-oscillates at full resonance |
+| Wavetables | `wavetable_morphs_and_avoids_aliasing`, `every_wavetable_waveform_plays_through_a_voice` | Position morphs, high notes use a band-limited table, every table sounds |
+| Bluetooth | `ble_parser_*` (4 tests) | BLE MIDI packets: several messages, running status (also across packets), realtime and SysEx skipped, bad packets ignored |
 
 ## By hand: app checklist
 
@@ -45,3 +49,7 @@ Do this on the desktop build and on an Android phone.
 | 12 | Close and reopen the app | "Test" is still in the preset list |
 | 13 | Put "cutoff=abc" in Test.preset with a text editor, then load it | Orange error message with the line number, the app keeps running |
 | 14 | Run without a sound card (or with it disabled) | Status shows "No sound: ...", the app keeps running |
+| 15 | ⚙ Settings → Search devices, with a BLE MIDI device (PSoC 6) switched on | The device appears at the top, marked "• MIDI" |
+| 16 | Tap the device, then play notes on it | Status shows "Connected to ...", notes sound and light up, the message counter rises |
+| 17 | Switch the device off while connected | Status shows "... disconnected", no notes keep hanging |
+| 18 | Search on a PC without Bluetooth | Orange "Bluetooth error: ..." message, the app keeps running |

@@ -21,6 +21,7 @@ jobs:
           host: linux
           target: desktop
           arch: linux_gcc_64
+          modules: 'qtconnectivity'
           cache: true
       - name: Remember the desktop Qt path
         run: echo "QT_HOST_PATH=$QT_ROOT_DIR" >> "$GITHUB_ENV"
@@ -31,6 +32,7 @@ jobs:
           host: all_os
           target: android
           arch: android_arm64_v8a
+          modules: 'qtconnectivity'
           cache: true
       - name: Install Android NDK r26b (the version Qt 6.8 is built with)
         run: |

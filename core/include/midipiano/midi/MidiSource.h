@@ -10,9 +10,9 @@ namespace midipiano::midi {
 
 // Vereiste 8: 8.useful and correct abstract base class
 // MidiSource is "iets dat MIDI-noten aanlevert". Er bestaat geen algemene bron: het is altijd een
-// concrete, zoals de DemoSequencer of straks BleMidiSource (de PSoC 6 via Bluetooth). Daarom is de
-// klasse abstract (alleen pure virtuele functies). SynthController werkt met een MidiSource en hoeft
-// dus niet te veranderen als de BLE-bron wordt toegevoegd.
+// concrete, zoals de DemoSequencer of de BleMidiSource (de PSoC 6 via Bluetooth, in app/). Daarom is
+// de klasse abstract (alleen pure virtuele functies). SynthController geeft beide bronnen dezelfde
+// callback; de synth merkt niet of een noot uit de demo of van de hardware komt.
 class MidiSource {
  public:
   using Callback = std::function<void(const MidiMessage&)>;

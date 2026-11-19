@@ -10,6 +10,7 @@
 #include <memory>
 #include <vector>
 
+#include "BleMidiSource.h"
 #include "midipiano/audio/AudioOutput.h"
 #include "midipiano/dsp/Synth.h"
 #include "midipiano/midi/MidiSource.h"
@@ -37,6 +38,8 @@ class SynthController : public QObject {
   Q_PROPERTY(QStringList instrumentNames READ instrumentNames CONSTANT)
   Q_PROPERTY(bool synthControlsEnabled READ synthControlsEnabled NOTIFY instrumentChanged)
   Q_PROPERTY(bool sustain READ sustain WRITE setSustain NOTIFY sustainChanged)
+  Q_PROPERTY(BleMidiSource* bluetooth READ bluetooth CONSTANT)
+  Q_PROPERTY(QString audioInfo READ audioInfo CONSTANT)
 
  public:
   explicit SynthController(QObject* parent = nullptr);
@@ -65,6 +68,8 @@ class SynthController : public QObject {
   QStringList instrumentNames() const { return instrumentNames_; }
   bool synthControlsEnabled() const { return synth_.currentUsesPatch(); }
   bool sustain() const { return synth_.sustain(); }
+  BleMidiSource* bluetooth() const { return bluetooth_.get(); }
+  QString audioInfo() const;
   void setSustain(bool down);
 
   void copyScope(std::vector<float>& out) const { synth_.scopeSnapshot(out); }
@@ -96,6 +101,8 @@ class SynthController : public QObject {
   // verder), en source_ wijst naar een MidiSource: nu de DemoSequencer, later de BLE-bron.
   std::unique_ptr<audio::AudioOutput> audio_;
   std::unique_ptr<midi::MidiSource> source_;
+  // Tweede MIDI-bron: Bluetooth (de PSoC 6). Na synth_ gedeclareerd, dus eerder afgebroken.
+  std::unique_ptr<BleMidiSource> bluetooth_;
   std::unique_ptr<preset::PresetStore> store_;
   QTimer* tick_;
   QString patchName_ = "Init";

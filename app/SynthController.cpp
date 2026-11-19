@@ -17,7 +17,10 @@ std::uint8_t toMidiByte(int value) { return static_cast<std::uint8_t>(std::clamp
 }  // namespace
 
 SynthController::SynthController(QObject* parent)
-    : QObject(parent), source_(std::make_unique<midi::DemoSequencer>()), tick_(new QTimer(this)) {
+    : QObject(parent),
+      source_(std::make_unique<midi::DemoSequencer>()),
+      bluetooth_(std::make_unique<BleMidiSource>()),
+      tick_(new QTimer(this)) {
   // new QTimer(this): de controller is de Qt-parent, dus Qt verwijdert de timer automatisch samen
   // met de controller ("kill children"), zonder delete.
   try {
@@ -43,11 +46,21 @@ SynthController::SynthController(QObject* parent)
   // activeVoicesChanged) waar WaveformView en de QML-labels op reageren. Zo weet de timer niets
   // van de scope, en de scope niets van de timer.
   connect(tick_, &QTimer::timeout, this, &SynthController::onTick);
+
+  // Bluetooth-noten volgen dezelfde weg als die van de demo-sequencer (polymorfie via MidiSource).
+  bluetooth_->start([this](const midi::MidiMessage& message) { onSourceMessage(message); });
   tick_->start(33);
 }
 
 SynthController::~SynthController() {
   if (source_) source_->stop();  // eerst de sequencer-thread stoppen, dan pas de synth afbreken
+}
+
+QString SynthController::audioInfo() const {
+  if (!audio_) return tr("No sound card");
+  const double rate = audio_->sampleRate();
+  const unsigned int frames = audio_->bufferFrames();
+  return tr("%1 Hz, buffer %2 samples (%3 ms)").arg(rate, 0, 'f', 0).arg(frames).arg(1000.0 * frames / rate, 0, 'f', 1);
 }
 
 void SynthController::loadSoundFont() {
@@ -142,7 +155,7 @@ void SynthController::toggleSequencer() {
 }
 
 void SynthController::onSourceMessage(const midi::MidiMessage& message) {
-  // Draait op de sequencer-thread: de synth is thread-safe, de GUI niet. Daarom gaat het signal
+  // Draait op de sequencer-thread (of de GUI-thread bij Bluetooth): de synth is thread-safe, de GUI niet. Daarom gaat het signal
   // via de Qt-eventlus (QueuedConnection) naar de GUI-thread.
   synth_.handle(message);
   const int note = message.note();

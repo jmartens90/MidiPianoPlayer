@@ -1,4 +1,7 @@
 find_package(Qt6 6.4 REQUIRED COMPONENTS Gui Quick QuickControls2 OpenGL)
+# Bluetooth MIDI heeft de module Qt Bluetooth nodig (in de Qt-installer: "Qt Connectivity"). Zonder
+# die module bouwt de app ook, alleen zonder Bluetooth.
+find_package(Qt6 6.4 QUIET COMPONENTS Bluetooth)
 qt_standard_project_setup()
 
 # Nieuwere Qt-versies (6.5+) waarschuwen anders over de standaard QML-resourcemap.
@@ -25,6 +28,8 @@ qt_add_qml_module(MidiPianoPlayer
   SOURCES
     SynthController.h
     SynthController.cpp
+    BleMidiSource.h
+    BleMidiSource.cpp
     WaveformView.h
     WaveformView.cpp
 )
@@ -43,6 +48,13 @@ target_link_libraries(MidiPianoPlayer PRIVATE
   Qt6::QuickControls2
   Qt6::OpenGL
 )
+if(TARGET Qt6::Bluetooth)
+  target_link_libraries(MidiPianoPlayer PRIVATE Qt6::Bluetooth)
+  target_compile_definitions(MidiPianoPlayer PRIVATE MIDIPIANO_HAS_BLUETOOTH)
+  message(STATUS "Bluetooth MIDI: on")
+else()
+  message(STATUS "Bluetooth MIDI: off (install the Qt Connectivity / Qt Bluetooth module to enable it)")
+endif()
 
 # Vereiste 60: 60.a nice extra that you think that should deserve grading (stuff you put time in and is not rewarded by an item above)
 # Dezelfde code bouwt als desktop-app en als Android-app (APK) voor de telefoon: kies in Qt Creator

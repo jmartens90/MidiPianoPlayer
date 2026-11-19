@@ -1,6 +1,7 @@
 # midipiano_core: de synth zonder Qt. Wordt gebruikt door de app en door de tests.
 add_library(midipiano_core STATIC
   src/AudioOutput.cpp
+  src/BleMidiParser.cpp
   src/DemoSequencer.cpp
   src/Envelope.cpp
   src/LowPassFilter.cpp

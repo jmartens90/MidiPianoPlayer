@@ -15,7 +15,7 @@ NOT_MARKED = {10, 11, 12, 14, 15, 16, 17, 18, 19}
 # Groen in de opdracht: moeten in de README staan.
 IN_README = {1, 20, 54, 55}
 # Nog niet gedaan (gepland): worden gemeld maar laten de check niet falen.
-PLANNED = {54, 55, 59}
+PLANNED = {54, 55}
 
 SOURCES = [p for p in ROOT.rglob("*") if p.suffix in {".h", ".cpp", ".qml", ".txt", ".md"}
            and "third_party" not in p.parts and "build" not in p.parts[0:2] and p.is_file()]
