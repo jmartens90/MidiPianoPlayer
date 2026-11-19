@@ -1,6 +1,14 @@
 find_package(Qt6 6.4 REQUIRED COMPONENTS Gui Quick QuickControls2 OpenGL)
 qt_standard_project_setup()
 
+# Nieuwere Qt-versies (6.5+) waarschuwen anders over de standaard QML-resourcemap.
+if(QT_KNOWN_POLICY_QTP0001)
+  qt_policy(SET QTP0001 NEW)
+endif()
+if(QT_KNOWN_POLICY_QTP0004)
+  qt_policy(SET QTP0004 NEW)
+endif()
+
 qt_add_executable(MidiPianoPlayer
   main.cpp
   Application.h
@@ -45,8 +53,11 @@ else()
   target_compile_options(MidiPianoPlayer PRIVATE -Wall -Wextra)
 endif()
 
-include(GNUInstallDirs)
-install(TARGETS MidiPianoPlayer
-  BUNDLE DESTINATION .
-  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-)
+# Installeren is alleen zinvol op de desktop; op Android maakt Qt een APK.
+if(NOT ANDROID)
+  include(GNUInstallDirs)
+  install(TARGETS MidiPianoPlayer
+    BUNDLE DESTINATION .
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+  )
+endif()
