@@ -1,19 +1,24 @@
 cmake_minimum_required(VERSION 3.16)
-project(MidiPianoPlayer CXX)
+project(MidiPianoPlayer VERSION 0.2.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
-add_executable(midipiano
-  src/main.cpp
-  src/DemoApp.cpp
-  src/Voice.cpp
-  src/Waveforms.cpp
-  src/WavWriter.cpp
-)
-target_include_directories(midipiano PRIVATE include)
-if(MSVC)
-  target_compile_options(midipiano PRIVATE /W4)
-else()
-  target_compile_options(midipiano PRIVATE -Wall -Wextra -Wpedantic)
+option(MIDIPIANO_BUILD_APP "Build the Qt app" ON)
+option(MIDIPIANO_BUILD_TESTS "Build the unit tests" ON)
+if(ANDROID)
+  set(MIDIPIANO_BUILD_TESTS OFF)  # tests draaien op de PC, niet op de telefoon
+endif()
+
+add_subdirectory(third_party/miniaudio)
+add_subdirectory(core)
+
+if(MIDIPIANO_BUILD_TESTS)
+  enable_testing()
+  add_subdirectory(tests)
+endif()
+
+if(MIDIPIANO_BUILD_APP)
+  add_subdirectory(app)
 endif()
