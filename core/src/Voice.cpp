@@ -1,5 +1,7 @@
 #include "midipiano/dsp/Voice.h"
 
+#include <cmath>
+
 #include "midipiano/util/MathUtil.h"
 
 namespace midipiano::dsp {
@@ -32,7 +34,11 @@ float Voice::render(float sampleRate) {
   // oscillator_ wijst naar een Sine-, Saw-, Square- of TriangleOscillator; next() roept de virtuele
   // sample() op, dus Voice hoeft niet te weten welke golfvorm de gebruiker koos.
   const float raw = oscillator_->next(frequencyHz_, sampleRate);
-  return filter_.process(raw, sampleRate) * envelope_.next(sampleRate) * gain_;
+  const float level = envelope_.next(sampleRate);
+  // Filter-envelope: de envelope opent de filter mee, tot 5 octaven boven de cutoff. Met veel
+  // resonantie geeft dat het typische "acid"-gekwaak.
+  const float cutoff = filter_.cutoff() * std::exp2(filterEnvAmount_ * 5.0f * level);
+  return filter_.process(raw, sampleRate, cutoff) * level * gain_;
 }
 
 void Voice::setWaveform(Waveform waveform) {
@@ -40,7 +46,13 @@ void Voice::setWaveform(Waveform waveform) {
   auto oscillator = OscillatorFactory::create(waveform);
   if (!oscillator) return;
   oscillator_ = std::move(oscillator);  // de oude oscillator wordt automatisch verwijderd
+  oscillator_->setPosition(wavetablePosition_);
   waveform_ = waveform;
+}
+
+void Voice::setWavetablePosition(float position) {
+  wavetablePosition_ = position;
+  oscillator_->setPosition(position);  // virtueel: alleen een WavetableOscillator doet er iets mee
 }
 
 }  // namespace midipiano::dsp

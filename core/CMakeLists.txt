@@ -13,6 +13,7 @@ add_library(midipiano_core STATIC
   src/SoundFont.cpp
   src/VoiceSynth.cpp
   src/Waveforms.cpp
+  src/Wavetable.cpp
 )
 target_include_directories(midipiano_core PUBLIC include)
 target_link_libraries(midipiano_core PUBLIC miniaudio tinysoundfont)
@@ -21,4 +22,11 @@ if(MSVC)
   target_compile_options(midipiano_core PRIVATE /W4)
 else()
   target_compile_options(midipiano_core PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
+# De wavetables worden bij het opstarten berekend (FFT). In een Debug-build duurt dat zonder
+# optimalisatie merkbaar lang, dus deze twee bestanden altijd met -O2 (niet voor MSVC: /O2 botst daar
+# met de Debug-controles).
+if(NOT MSVC)
+  set_source_files_properties(src/Wavetable.cpp src/Waveforms.cpp PROPERTIES COMPILE_OPTIONS "-O2")
 endif()

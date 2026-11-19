@@ -11,7 +11,7 @@
 
 namespace midipiano::dsp {
 
-// Een Voice speelt een noot: oscillator -> filter -> envelope -> volume.
+// Een Voice speelt een noot: oscillator -> resonante filter (door de envelope gemoduleerd) -> envelope -> volume.
 class Voice {
  public:
   Voice() : Voice(Waveform::Sine) {}
@@ -24,6 +24,8 @@ class Voice {
   void setWaveform(Waveform waveform);
   Envelope& envelope() { return envelope_; }
   LowPassFilter& filter() { return filter_; }
+  void setFilterEnvAmount(float amount) { filterEnvAmount_ = amount; }
+  void setWavetablePosition(float position);
 
   bool isActive() const { return !envelope_.isIdle(); }
   bool isHeld() const { return held_; }
@@ -48,6 +50,8 @@ class Voice {
   // note_ onthoudt welke toets deze Voice speelt, zodat Synth::noteOff() bij het loslaten van C4
   // precies de Voice(s) met note_ == 60 kan vinden en loslaten.
   std::uint8_t note_ = 0;
+  float filterEnvAmount_ = 0.0f;
+  float wavetablePosition_ = 0.0f;
   Waveform waveform_;
   float gain_ = 0.0f;
   float frequencyHz_ = 0.0f;

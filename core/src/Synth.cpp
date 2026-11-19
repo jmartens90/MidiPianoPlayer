@@ -10,7 +10,7 @@ namespace midipiano::dsp {
 Synth::Synth(float sampleRate) : sampleRate_(sampleRate), reverb_(sampleRate) {
   instruments_.push_back(std::make_unique<VoiceSynth>(sampleRate));  // instrument 0: de synth
   scratch_.resize(4096);
-  reverb_.setAmount(patch_.get("reverb"));
+  applyReverbSettings();
 }
 
 void Synth::handle(const midi::MidiMessage& message) {
@@ -140,11 +140,22 @@ bool Synth::currentUsesPatch() const {
 void Synth::applyPatch(const preset::Patch& patch) {
   std::lock_guard<std::mutex> lock(mutex_);
   patch_ = patch;
-  reverb_.setAmount(patch_.get("reverb"));
+  applyReverbSettings();
   // Vereiste 38: 38.at least 4 useful const references for variables (1/4)
   // instrument is een const-referentie naar elke unique_ptr in de vector: een unique_ptr kan je niet
   // kopieren, en const garandeert dat we de lijst zelf hier niet wijzigen.
   for (const auto& instrument : instruments_) instrument->applyPatch(patch_);
+}
+
+void Synth::applyReverbSettings() {
+  dsp::Reverb::Settings settings;
+  settings.mix = patch_.get("reverb");
+  settings.predelay = patch_.get("reverb_predelay");
+  settings.decay = patch_.get("reverb_decay");
+  settings.damping = patch_.get("reverb_damp");
+  settings.lowCutHz = patch_.get("reverb_lowcut");
+  settings.highCutHz = patch_.get("reverb_highcut");
+  reverb_.setSettings(settings);
 }
 
 preset::Patch Synth::patch() const {

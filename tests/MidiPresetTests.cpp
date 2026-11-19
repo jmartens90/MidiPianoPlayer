@@ -85,7 +85,7 @@ TEST(factory_presets_are_installed_once) {
   const preset::PresetStore store(freshTempDir("factory"));
   store.installFactoryPresets();
   store.installFactoryPresets();
-  CHECK(store.list().size() == 4);
+  CHECK(store.list().size() == 5);
   CHECK(store.load("Soft Pad").waveform() == dsp::Waveform::Triangle);
 }
 

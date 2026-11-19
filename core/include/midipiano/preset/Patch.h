@@ -10,7 +10,7 @@
 
 namespace midipiano::preset {
 
-// Een klankinstelling: golfvorm + ADSR + cutoff + volume + galm, met een naam. Wordt opgeslagen als preset.
+// Een klankinstelling: golfvorm + ADSR + resonante filter + volume + galm, met een naam. Wordt opgeslagen als preset.
 class Patch {
  public:
   // Vereiste 21: 21.at least 2 default constructors

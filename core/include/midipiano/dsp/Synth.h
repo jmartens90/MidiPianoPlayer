@@ -65,6 +65,8 @@ class Synth {
   std::size_t activeVoiceCount() const;
 
  private:
+  void applyReverbSettings();  // patch_ -> reverb_ (mutex moet al vast zijn)
+
   mutable std::mutex mutex_;
   std::vector<std::unique_ptr<Instrument>> instruments_;
   std::size_t current_ = 0;

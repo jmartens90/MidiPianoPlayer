@@ -10,9 +10,13 @@
 namespace midipiano::dsp {
 
 // Vereiste 37: 37.2 useful unsigned chars or other better usage of memory efficient type
-// Er zijn maar 4 golfvormen, dus een enum class op std::uint8_t (1 byte) volstaat in plaats van
+// Er zijn maar 10 golfvormen, dus een enum class op std::uint8_t (1 byte) volstaat in plaats van
 // een int (4 bytes). Zie ook MidiMessage, dat MIDI-bytes als std::uint8_t opslaat.
-enum class Waveform : std::uint8_t { Sine, Saw, Square, Triangle, Count };
+// De eerste vier zijn klassieke golfvormen met een vaste vorm. De rest zijn wavetables: met de
+// Position-knop morph je door hun frames (zie Wavetable.h).
+enum class Waveform : std::uint8_t { Sine, Saw, Square, Triangle, Analog, Harmonics, PWM, Sync, Formant, Fold, Count };
+
+bool isWavetable(Waveform waveform);
 
 std::string waveformName(Waveform waveform);
 Waveform waveformFromName(const std::string& name);  // gooit std::invalid_argument

@@ -24,8 +24,14 @@ class Oscillator {
   virtual float sample(float phase) const = 0;
   virtual std::string name() const = 0;
 
+  // Haakjes voor oscillatoren die meer nodig hebben dan de fase. Standaard doen ze niets; de
+  // WavetableOscillator kiest in prepare() de juiste anti-aliasing-versie en morpht met setPosition().
+  virtual void prepare(float /*frequencyHz*/, float /*sampleRate*/) {}
+  virtual void setPosition(float /*position*/) {}
+
   // Geeft het volgende sample en schuift de fase (0..1) op.
   float next(float frequencyHz, float sampleRate) {
+    prepare(frequencyHz, sampleRate);
     const float out = sample(phase_);
     phase_ += frequencyHz / sampleRate;
     if (phase_ >= 1.0f) phase_ -= static_cast<float>(static_cast<int>(phase_));

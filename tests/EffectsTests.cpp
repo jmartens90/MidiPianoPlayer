@@ -3,8 +3,12 @@
 #include <vector>
 
 #include "TestFramework.h"
+#include "midipiano/dsp/LowPassFilter.h"
 #include "midipiano/dsp/Reverb.h"
 #include "midipiano/dsp/Synth.h"
+#include "midipiano/dsp/Voice.h"
+#include "midipiano/dsp/Waveforms.h"
+#include "midipiano/dsp/Wavetable.h"
 #include "midipiano/midi/MidiMessage.h"
 
 using namespace midipiano;
@@ -60,4 +64,65 @@ TEST(reverb_off_leaves_the_signal_untouched) {
   std::vector<float> buffer{0.1f, -0.2f, 0.3f};
   reverb.process(buffer.data(), buffer.size());
   CHECK(buffer[0] == 0.1f && buffer[1] == -0.2f && buffer[2] == 0.3f);
+}
+
+TEST(reverb_predelay_delays_the_first_reflection) {
+  dsp::Reverb reverb(10000.0f);
+  dsp::Reverb::Settings settings;
+  settings.mix = 1.0f;
+  settings.predelay = 0.2f;  // 2000 samples
+  settings.lowCutHz = 20.0f;
+  reverb.setSettings(settings);
+  std::vector<float> buffer(4000, 0.0f);
+  buffer[0] = 1.0f;
+  reverb.process(buffer.data(), buffer.size());
+  // Voor predelay + de kortste kamfilter (~250 samples) mag er nog geen galm zijn.
+  float early = 0.0f;
+  for (std::size_t i = 1; i < 2200; ++i) early = std::max(early, std::fabs(buffer[i]));
+  CHECK(early < 1e-6f);
+  CHECK(peakOf(buffer, 2200) > 1e-4f);
+}
+
+TEST(resonant_filter_rings_and_can_self_oscillate) {
+  auto ringAfterImpulse = [](float resonance) {
+    dsp::LowPassFilter filter;
+    filter.setCutoff(1000.0f);
+    filter.setResonance(resonance);
+    filter.process(1.0f, 48000.0f);
+    float late = 0.0f;
+    for (int i = 0; i < 48000; ++i) {
+      const float y = filter.process(0.0f, 48000.0f);
+      if (i > 24000) late = std::max(late, std::fabs(y));  // na een halve seconde
+    }
+    return late;
+  };
+  CHECK(ringAfterImpulse(0.0f) < 1e-4f);  // zonder resonantie is de puls snel weg
+  CHECK(ringAfterImpulse(1.0f) > 0.05f);  // met volle resonantie blijft de filter fluiten
+}
+
+TEST(wavetable_morphs_and_avoids_aliasing) {
+  const dsp::Wavetable table("Test", [](float x, float t) { return t < 0.5f ? std::sin(6.2831853f * x) : 2.0f * x - 1.0f; });
+  // Positie 0 is een sinus, positie 1 een zaagtand: halverwege de periode verschillen ze.
+  CHECK(std::fabs(table.read(0.25f, 0.0f, 0) - 1.0f) < 0.01f);
+  CHECK(std::fabs(table.read(0.25f, 1.0f, 0) - table.read(0.25f, 0.0f, 0)) > 0.3f);
+  // Een hoge noot (5 kHz bij 48 kHz) mag maximaal 4 boventonen hebben: de zaagtand wordt dan bijna
+  // een sinus, dus geen scherpe sprong meer bij fase 0.
+  const std::size_t level = dsp::Wavetable::mipLevelFor(5000.0f, 48000.0f);
+  CHECK((dsp::Wavetable::kSize / 2 >> level) <= 4);
+  const float jump = std::fabs(table.read(0.999f, 1.0f, level) - table.read(0.001f, 1.0f, level));
+  CHECK(jump < 0.2f);
+}
+
+TEST(every_wavetable_waveform_plays_through_a_voice) {
+  for (int i = static_cast<int>(dsp::Waveform::Analog); i < static_cast<int>(dsp::Waveform::Count); ++i) {
+    const auto waveform = static_cast<dsp::Waveform>(i);
+    CHECK(dsp::isWavetable(waveform));
+    dsp::Voice voice(waveform);
+    voice.setWavetablePosition(0.5f);
+    voice.start(60, 127, 0);
+    float p = 0.0f;
+    for (int n = 0; n < 4800; ++n) p = std::max(p, std::fabs(voice.render(48000.0f)));
+    CHECK(p > 0.05f);
+  }
+  CHECK(!dsp::isWavetable(dsp::Waveform::Saw));
 }

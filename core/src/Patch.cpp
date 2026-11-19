@@ -4,12 +4,19 @@
 
 namespace midipiano::preset {
 
-Patch::Patch() : name_("Init"), waveform_(dsp::Waveform::Saw) {
+Patch::Patch() : name_("Init"), waveform_(dsp::Waveform::Analog) {
   // naam, minimum, maximum, standaard
   for (const Param& param : {Param("attack", 0.001f, 2.0f, 0.01f), Param("decay", 0.01f, 2.0f, 0.3f),
                              Param("sustain", 0.0f, 1.0f, 0.6f), Param("release", 0.01f, 3.0f, 0.4f),
                              Param("cutoff", 100.0f, 12000.0f, 3000.0f), Param("volume", 0.0f, 1.0f, 0.7f),
-                             Param("reverb", 0.0f, 1.0f, 0.25f)}) {
+                             Param("position", 0.0f, 1.0f, 0.66f),
+                             Param("resonance", 0.0f, 1.0f, 0.2f), Param("drive", 1.0f, 10.0f, 1.0f),
+                             Param("envmod", 0.0f, 1.0f, 0.0f),
+                             // Galm: mix, predelay (s), uitklinktijd, demping, low cut voor en high cut na de galm.
+                             Param("reverb", 0.0f, 1.0f, 0.25f), Param("reverb_predelay", 0.0f, 0.25f, 0.02f),
+                             Param("reverb_decay", 0.0f, 1.0f, 0.6f), Param("reverb_damp", 0.0f, 1.0f, 0.3f),
+                             Param("reverb_lowcut", 20.0f, 1000.0f, 150.0f),
+                             Param("reverb_highcut", 1000.0f, 16000.0f, 7000.0f)}) {
     params_.emplace(param.name(), param);
   }
 }

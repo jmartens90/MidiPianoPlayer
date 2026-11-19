@@ -4,7 +4,12 @@
 
 namespace midipiano::dsp {
 
-VoiceSynth::VoiceSynth(float sampleRate) : sampleRate_(sampleRate) { applyPatch(preset::Patch()); }
+VoiceSynth::VoiceSynth(float sampleRate) : sampleRate_(sampleRate) {
+  // Alle wavetables nu al berekenen (een paar honderd ms), zodat het wisselen van golfvorm tijdens
+  // het spelen geen hapering in de audio geeft.
+  for (int i = 0; i < static_cast<int>(Waveform::Count); ++i) OscillatorFactory::create(static_cast<Waveform>(i));
+  applyPatch(preset::Patch());
+}
 
 // Vereiste 29: 29.useful member function
 // noteOn() is het hart van de polyfonie: het zoekt een vrije stem, en als alle 8 bezet zijn, neemt
@@ -41,11 +46,15 @@ std::size_t VoiceSynth::activeVoiceCount() const {
 void VoiceSynth::applyPatch(const preset::Patch& patch) {
   for (Voice& voice : voices_) {
     voice.setWaveform(patch.waveform());
+    voice.setWavetablePosition(patch.get("position"));
     voice.envelope().setAttack(patch.get("attack"));
     voice.envelope().setDecay(patch.get("decay"));
     voice.envelope().setSustain(patch.get("sustain"));
     voice.envelope().setRelease(patch.get("release"));
     voice.filter().setCutoff(patch.get("cutoff"));
+    voice.filter().setResonance(patch.get("resonance"));
+    voice.filter().setDrive(patch.get("drive"));
+    voice.setFilterEnvAmount(patch.get("envmod"));
   }
 }
 

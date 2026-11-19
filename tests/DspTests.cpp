@@ -36,7 +36,8 @@ TEST(waveforms_have_expected_values) {
 // unique_ptr<Oscillator> terug, en via dezelfde basispointer geeft sample() en name() telkens het
 // resultaat van de juiste afgeleide klasse. Zie ook sequencer_works_through_base_class.
 TEST(factory_returns_right_oscillator_through_base_pointer) {
-  const std::vector<std::string> expected = {"Sine", "Saw", "Square", "Triangle"};
+  const std::vector<std::string> expected = {"Sine", "Saw", "Square", "Triangle", "Analog",
+                                             "Harmonics", "PWM", "Sync", "Formant", "Fold"};
   for (int i = 0; i < static_cast<int>(dsp::Waveform::Count); ++i) {
     std::unique_ptr<dsp::Oscillator> oscillator = dsp::OscillatorFactory::create(static_cast<dsp::Waveform>(i));
     CHECK(oscillator != nullptr);

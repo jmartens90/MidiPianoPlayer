@@ -7,9 +7,10 @@ import MidiPiano
 // Vereiste 56: 56.meaningful usage of a GUI (not just a screen that shows some text and a textfield)
 // De interface is een speelbaar instrument: een multitouch-pianotoetsenbord (akkoorden, glissando,
 // aanslagsterkte), een keuze uit acht gesamplede instrumenten (vleugel, elektrische piano, orgel,
-// ...) of de eigen synth met vier golfvormen en draaiknoppen voor ADSR, cutoff, galm en volume, een sustainpedaal, een live
-// OpenGL-oscilloscoop, presets laden en opslaan, een demo-sequencer waarvan de noten oplichten op het
-// toetsenbord, en octaaf-knoppen. Op een gsm staat de app liggend, met een
+// ...) of de eigen wavetable-synth (tien golfvormen, morphen met Position) met draaiknoppen voor
+// ADSR, een resonante filter met drive en filter-envelope, en volume. Verder een instelbare galm, een
+// sustainpedaal, een live OpenGL-oscilloscoop, presets laden en opslaan, een demo-sequencer waarvan
+// de noten oplichten op het toetsenbord, en octaaf-knoppen. Op een gsm staat de app liggend, met een
 // compacte bovenbalk zodat het toetsenbord zo groot mogelijk is.
 ApplicationWindow {
     id: window
@@ -123,6 +124,45 @@ ApplicationWindow {
         }
     }
 
+    // Galm-instellingen: werken voor elk instrument, ook de piano.
+    Popup {
+        id: reverbPanel
+        anchors.centerIn: parent
+        modal: true
+        padding: 16
+        onClosed: keyboard.forceActiveFocus()
+        Column {
+            spacing: 8
+            Label { text: qsTr("Reverb"); font.bold: true; font.pixelSize: 16 }
+            Row {
+                spacing: 8
+                Repeater {
+                    model: [
+                        { param: "reverb", label: qsTr("Mix"), from: 0, to: 1, log: false, unit: "", dec: 2 },
+                        { param: "reverb_predelay", label: qsTr("Predelay"), from: 0, to: 0.25, log: false, unit: " s", dec: 2 },
+                        { param: "reverb_decay", label: qsTr("Decay"), from: 0, to: 1, log: false, unit: "", dec: 2 },
+                        { param: "reverb_damp", label: qsTr("Damping"), from: 0, to: 1, log: false, unit: "", dec: 2 },
+                        { param: "reverb_lowcut", label: qsTr("Low cut (pre)"), from: 20, to: 1000, log: true, unit: " Hz", dec: 0 },
+                        { param: "reverb_highcut", label: qsTr("High cut (post)"), from: 1000, to: 16000, log: true, unit: " Hz", dec: 0 }
+                    ]
+                    Knob {
+                        required property var modelData
+                        width: 100
+                        dialSize: 58
+                        synth: window.engine
+                        paramName: modelData.param
+                        label: modelData.label
+                        from: modelData.from
+                        to: modelData.to
+                        logarithmic: modelData.log
+                        unit: modelData.unit
+                        decimals: modelData.dec
+                    }
+                }
+            }
+        }
+    }
+
     Dialog {
         id: saveDialog
         title: qsTr("Save preset")
@@ -157,54 +197,38 @@ ApplicationWindow {
                 spacing: 2
                 enabled: synth.synthControlsEnabled
                 opacity: enabled ? 1 : 0.35
-                Label { text: qsTr("Waveform"); opacity: 0.75; font.pixelSize: 11 }
+                Label { text: qsTr("Wave"); opacity: 0.75; font.pixelSize: 11 }
+                // Vier klassieke golfvormen en zes wavetables (Analog, Harmonics, PWM, Sync, Formant, Fold).
                 ComboBox {
-                    visible: window.compact
-                    Layout.preferredWidth: 120
+                    Layout.preferredWidth: window.compact ? 118 : 140
                     model: synth.waveformNames
                     currentIndex: synth.waveform
                     focusPolicy: Qt.NoFocus
                     onActivated: (index) => synth.waveform = index
                 }
-                GridLayout {
-                    visible: !window.compact
-                    columns: 2
-                    rowSpacing: 0
-                    columnSpacing: 4
-                    ButtonGroup { id: waveGroup }
-                    Repeater {
-                        model: synth.waveformNames
-                        Button {
-                            required property int index
-                            required property string modelData
-                            text: modelData
-                            Layout.preferredWidth: 88
-                            checkable: true
-                            checked: synth.waveform === index
-                            ButtonGroup.group: waveGroup
-                            focusPolicy: Qt.NoFocus
-                            onClicked: synth.waveform = index
-                        }
-                    }
-                }
             }
 
             Row {
-                spacing: window.compact ? 2 : 8
+                spacing: window.compact ? 0 : 4
                 Repeater {
+                    // kind: "synth" = alleen voor de eigen synth, "wt" = alleen bij een wavetable,
+                    // "all" = ook voor de gesamplede instrumenten.
                     model: [
-                        { param: "attack", label: qsTr("Attack"), from: 0.001, to: 2, log: true, unit: " s", dec: 2 },
-                        { param: "decay", label: qsTr("Decay"), from: 0.01, to: 2, log: true, unit: " s", dec: 2 },
-                        { param: "sustain", label: qsTr("Sustain"), from: 0, to: 1, log: false, unit: "", dec: 2 },
-                        { param: "release", label: qsTr("Release"), from: 0.01, to: 3, log: true, unit: " s", dec: 2 },
-                        { param: "cutoff", label: qsTr("Cutoff"), from: 100, to: 12000, log: true, unit: " Hz", dec: 0 },
-                        { param: "reverb", label: qsTr("Reverb"), from: 0, to: 1, log: false, unit: "", dec: 2 },
-                        { param: "volume", label: qsTr("Volume"), from: 0, to: 1, log: false, unit: "", dec: 2 }
+                        { param: "attack", label: qsTr("Attack"), from: 0.001, to: 2, log: true, unit: " s", dec: 2, kind: "synth" },
+                        { param: "decay", label: qsTr("Decay"), from: 0.01, to: 2, log: true, unit: " s", dec: 2, kind: "synth" },
+                        { param: "sustain", label: qsTr("Sustain"), from: 0, to: 1, log: false, unit: "", dec: 2, kind: "synth" },
+                        { param: "release", label: qsTr("Release"), from: 0.01, to: 3, log: true, unit: " s", dec: 2, kind: "synth" },
+                        { param: "position", label: qsTr("Position"), from: 0, to: 1, log: false, unit: "", dec: 2, kind: "wt" },
+                        { param: "cutoff", label: qsTr("Cutoff"), from: 100, to: 12000, log: true, unit: " Hz", dec: 0, kind: "synth" },
+                        { param: "resonance", label: qsTr("Reso"), from: 0, to: 1, log: false, unit: "", dec: 2, kind: "synth" },
+                        { param: "drive", label: qsTr("Drive"), from: 1, to: 10, log: true, unit: "x", dec: 1, kind: "synth" },
+                        { param: "envmod", label: qsTr("Env→Filt"), from: 0, to: 1, log: false, unit: "", dec: 2, kind: "synth" },
+                        { param: "volume", label: qsTr("Volume"), from: 0, to: 1, log: false, unit: "", dec: 2, kind: "all" }
                     ]
                     Knob {
                         required property var modelData
-                        width: window.compact ? 56 : 66
-                        dialSize: window.compact ? 40 : 58
+                        width: window.compact ? 52 : 64
+                        dialSize: window.compact ? 38 : 56
                         compact: window.compact
                         synth: window.engine
                         paramName: modelData.param
@@ -214,12 +238,20 @@ ApplicationWindow {
                         logarithmic: modelData.log
                         unit: modelData.unit
                         decimals: modelData.dec
-                        // Golfvorm, ADSR en cutoff gelden alleen voor de synth; galm en volume voor alles.
-                        enabled: modelData.param === "volume" || modelData.param === "reverb"
-                                 || window.engine.synthControlsEnabled
+                        enabled: modelData.kind === "all"
+                                 || (window.engine.synthControlsEnabled
+                                     && (modelData.kind === "synth" || window.engine.waveformIsWavetable))
                         opacity: enabled ? 1 : 0.35
                     }
                 }
+            }
+
+            Button {
+                text: qsTr("Reverb")
+                Layout.preferredWidth: window.compact ? 78 : 92
+                highlighted: reverbPanel.opened
+                focusPolicy: Qt.NoFocus
+                onClicked: reverbPanel.open()
             }
 
             Rectangle {

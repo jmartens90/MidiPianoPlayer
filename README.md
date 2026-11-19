@@ -12,18 +12,23 @@ the same kind of pattern.
 * A sampled **Grand Piano** and 7 more sampled instruments (Bright Grand, Tine and FM electric piano,
   Vibraphone, Pipe Organ, Strings, Warm Pad), played from a SoundFont with
   [TinySoundFont](https://github.com/schellingb/TinySoundFont).
-* A built-in synth: 8 voices with voice stealing, four waveforms (sine, saw, square, triangle), an ADSR
-  envelope and a low-pass filter per voice.
+* A built-in wavetable synth: 8 voices with voice stealing, four classic waveforms and six wavetables
+  (Analog, Harmonics, PWM, Sync, Formant, Fold) that you morph through with the Position knob. The
+  tables are band-limited per octave with an FFT, so high notes don't alias. Every voice has an ADSR
+  envelope and a resonant 24 dB ladder filter with drive and filter envelope; at full resonance it
+  self-oscillates.
 * A multitouch keyboard: slide over the keys (glissando), and touch lower on a key to play louder.
   On a PC you can also play with the mouse or the computer keyboard (`A W S E D F T G Y H U J K`).
 * A live oscilloscope drawn with OpenGL.
-* Presets saved as text files, with four factory presets (Soft Pad, Square Lead, Pluck, Sine Organ).
+* Presets saved as text files, with five factory presets (Soft Pad, Square Lead, Pluck, Sine Organ, Nasty Acid).
 * A demo sequencer running on its own thread. Its notes light up on the keyboard.
 * Low-latency audio through [miniaudio](https://miniaud.io): WASAPI, Core Audio, PulseAudio/ALSA or AAudio.
 * A sustain pedal (button, space bar or MIDI CC 64) and a Freeverb-style reverb that works on every instrument.
 * On Android the app always runs in landscape, with a compact control bar so the keyboard gets the most room.
 
 ![Phone, landscape](docs/images/phone-landscape.png)
+
+![Reverb panel](docs/images/reverb-panel.png)
 
 <!-- Vereiste 20: 20.working build manual as readme on GitHub (project must be possible to build from scratch on a clean PC) -->
 ## Build manual
@@ -82,10 +87,14 @@ Only the app is built for Android. The unit tests run on the PC.
 |---|---|
 | Keys | Touch, click or type to play. Several fingers = a chord. Slide = glissando. Low on a key = louder |
 | Instrument | Grand Piano and the other sampled instruments, or "Synth" for the built-in synth |
-| Waveform | (Synth only) Sine (soft), Saw (bright), Square (hollow), Triangle (mellow) |
+| Wave | (Synth only) Sine, Saw, Square, Triangle, or one of the six wavetables |
+| Position | (Synth, wavetables only) Morphs through the frames of the wavetable |
 | Attack / Decay / Sustain / Release | (Synth only) How a note fades in, drops to its held level, and rings out |
 | Cutoff | (Synth only) Low-pass filter: lower = darker sound |
-| Reverb | Amount of room sound (0 = dry) |
+| Reso | (Synth only) Filter resonance: a whistling peak at the cutoff; at the top the filter sings by itself |
+| Drive | (Synth only) Pushes the filter into saturation for a dirtier sound |
+| Env→Filt | (Synth only) How far the envelope opens the filter on every note (the "acid" squelch) |
+| Reverb | Opens the reverb panel: Mix, Predelay, Decay, Damping, Low cut (pre-filter on the reverb input) and High cut (post-filter on the reverb output) |
 | Volume | Master volume |
 | Pedal | Sustain pedal: released notes keep ringing until you turn it off. On a PC you can also hold the space bar |
 | Octave − / + | Shift the keyboard from C0 to C6 |
@@ -100,7 +109,7 @@ Presets are plain text files in the app's data folder, for example
 
 | Folder | Contents |
 |---|---|
-| `core/` | The sound engine without Qt: `dsp` (instruments, SoundFont, oscillators, envelope, filter, voice, synth), `midi` (messages, sources, demo sequencer), `preset` (patches, files), `audio` (sound card), `util` |
+| `core/` | The sound engine without Qt: `dsp` (instruments, SoundFont, oscillators, wavetables, envelope, ladder filter, reverb, voice, synth), `midi` (messages, sources, demo sequencer), `preset` (patches, files), `audio` (sound card), `util` |
 | `app/` | The Qt Quick app: `Application`, `SynthController`, `WaveformView` (OpenGL) the QML files, and `android/AndroidManifest.xml` (locks the phone app to landscape) |
 | `tests/` | Unit tests for `core/` |
 | `docs/` | [Test plan](docs/TESTPLAN.md) and screenshots |
@@ -191,9 +200,11 @@ classDiagram
         +applyPatch(const Patch&)
     }
     class Reverb {
+        -Settings settings_
+        -vector~float~ predelayLine_
         -vector~Comb~ combs_
         -vector~Allpass~ allpasses_
-        +setAmount(amount)
+        +setSettings(const Settings&)
         +process(float*, frames)
     }
     class Voice {
@@ -211,6 +222,18 @@ classDiagram
         +next(freq, sampleRate) float
         +sample(phase)* float
         +name()* string
+        +prepare(freq, sampleRate)
+        +setPosition(position)
+    }
+    class WavetableOscillator {
+        -shared_ptr~const Wavetable~ table_
+        -float position_
+    }
+    class Wavetable {
+        -vector~float~ data_
+        +Wavetable(name, shape)
+        +read(phase, position, mipLevel) float
+        +mipLevelFor(freq, sampleRate)$ size_t
     }
     class SineOscillator
     class SawOscillator
@@ -228,8 +251,11 @@ classDiagram
         +next(sampleRate) float
     }
     class LowPassFilter {
+        -array~float,4~ stage_
         +setCutoff(hz)
-        +process(x, sampleRate) float
+        +setResonance(amount)
+        +setDrive(drive)
+        +process(x, sampleRate, cutoff) float
     }
     class MidiMessage {
         -uint8_t status_
@@ -317,6 +343,8 @@ classDiagram
     Oscillator <|-- SawOscillator
     Oscillator <|-- SquareOscillator
     Oscillator <|-- TriangleOscillator
+    Oscillator <|-- WavetableOscillator
+    WavetableOscillator o-- Wavetable
     OscillatorFactory ..> Oscillator : creates
     MidiSource <|-- DemoSequencer
     MidiSource <|.. BleMidiSource

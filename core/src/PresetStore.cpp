@@ -93,11 +93,14 @@ void PresetStore::installFactoryPresets() const {
   Patch organ;
   organ.setWaveform(Waveform::Sine).set("attack", 0.01f).set("decay", 0.1f).set("sustain", 1.0f).set("release", 0.1f).set("cutoff", 12000.0f);
   organ.setName("Sine Organ");
+  Patch acid;
+  acid.setWaveform(Waveform::Saw).set("attack", 0.001f).set("decay", 0.18f).set("sustain", 0.2f).set("release", 0.1f).set("cutoff", 250.0f).set("resonance", 0.92f).set("drive", 6.0f).set("envmod", 0.7f).set("reverb", 0.1f);
+  acid.setName("Nasty Acid");
 
   // Vereiste 38: 38.at least 4 useful const references for variables (3/4)
-  // patch verwijst naar elk van de vier presets in de lijst: zonder kopie en alleen-lezen, want
+  // patch verwijst naar elk van de vijf presets in de lijst: zonder kopie en alleen-lezen, want
   // opslaan mag een patch niet wijzigen.
-  for (const Patch& patch : {pad, lead, pluck, organ}) {
+  for (const Patch& patch : {pad, lead, pluck, organ, acid}) {
     if (!exists(patch.name())) save(patch);
   }
 }

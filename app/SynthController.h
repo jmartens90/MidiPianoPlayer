@@ -27,6 +27,7 @@ class SynthController : public QObject {
   QML_ELEMENT
   Q_PROPERTY(int waveform READ waveform WRITE setWaveform NOTIFY patchChanged)
   Q_PROPERTY(QStringList waveformNames READ waveformNames CONSTANT)
+  Q_PROPERTY(bool waveformIsWavetable READ waveformIsWavetable NOTIFY patchChanged)
   Q_PROPERTY(QString patchName READ patchName NOTIFY patchChanged)
   Q_PROPERTY(QStringList presets READ presets NOTIFY presetsChanged)
   Q_PROPERTY(bool sequencerRunning READ sequencerRunning NOTIFY sequencerRunningChanged)
@@ -53,6 +54,7 @@ class SynthController : public QObject {
   int waveform() const;
   void setWaveform(int waveform);
   QStringList waveformNames() const;
+  bool waveformIsWavetable() const { return dsp::isWavetable(synth_.patch().waveform()); }
   QString patchName() const { return patchName_; }
   QStringList presets() const { return presets_; }
   bool sequencerRunning() const;
