@@ -20,7 +20,8 @@ the same kind of pattern.
 * Presets saved as text files, with four factory presets (Soft Pad, Square Lead, Pluck, Sine Organ).
 * A demo sequencer running on its own thread. Its notes light up on the keyboard.
 * Low-latency audio through [miniaudio](https://miniaud.io): WASAPI, Core Audio, PulseAudio/ALSA or AAudio.
-* On Android the app runs fullscreen in landscape, with a compact control bar so the keyboard gets the most room.
+* A sustain pedal (button, space bar or MIDI CC 64) and a Freeverb-style reverb that works on every instrument.
+* On Android the app always runs in landscape, with a compact control bar so the keyboard gets the most room.
 
 ![Phone, landscape](docs/images/phone-landscape.png)
 
@@ -84,7 +85,9 @@ Only the app is built for Android. The unit tests run on the PC.
 | Waveform | (Synth only) Sine (soft), Saw (bright), Square (hollow), Triangle (mellow) |
 | Attack / Decay / Sustain / Release | (Synth only) How a note fades in, drops to its held level, and rings out |
 | Cutoff | (Synth only) Low-pass filter: lower = darker sound |
+| Reverb | Amount of room sound (0 = dry) |
 | Volume | Master volume |
+| Pedal | Sustain pedal: released notes keep ringing until you turn it off. On a PC you can also hold the space bar |
 | Octave − / + | Shift the keyboard from C0 to C6 |
 | Preset list / Save | (Synth only) Load a preset, or save the current synth sound under a name |
 | Play demo | Starts the demo sequencer (an Am - F - C - G arpeggio) |
@@ -98,7 +101,7 @@ Presets are plain text files in the app's data folder, for example
 | Folder | Contents |
 |---|---|
 | `core/` | The sound engine without Qt: `dsp` (instruments, SoundFont, oscillators, envelope, filter, voice, synth), `midi` (messages, sources, demo sequencer), `preset` (patches, files), `audio` (sound card), `util` |
-| `app/` | The Qt Quick app: `Application`, `SynthController`, `WaveformView` (OpenGL) and the QML files |
+| `app/` | The Qt Quick app: `Application`, `SynthController`, `WaveformView` (OpenGL) the QML files, and `android/AndroidManifest.xml` (locks the phone app to landscape) |
 | `tests/` | Unit tests for `core/` |
 | `docs/` | [Test plan](docs/TESTPLAN.md) and screenshots |
 | `tools/` | `check_vereisten.py`, which checks that every requirement is marked in the code |
@@ -176,13 +179,22 @@ classDiagram
         -Patch patch_
         -mutex mutex_
         -RingBuffer~float~ scope_
+        -Reverb reverb_
+        -bitset~128~ sustained_
         +handle(const MidiMessage&)
         +noteOn(note, velocity = 100)
         +noteOff(note)
+        +setSustain(bool)
         +render(vector~float~&)
         +addInstrument(unique_ptr~Instrument~)
         +selectInstrument(index)
         +applyPatch(const Patch&)
+    }
+    class Reverb {
+        -vector~Comb~ combs_
+        -vector~Allpass~ allpasses_
+        +setAmount(amount)
+        +process(float*, frames)
     }
     class Voice {
         -unique_ptr~Oscillator~ oscillator_
@@ -295,6 +307,7 @@ classDiagram
     SoundFontInstrument o-- SoundFont : shared
     Synth *-- Patch
     Synth *-- RingBuffer
+    Synth *-- Reverb
     Synth ..> MidiMessage : handle()
     SynthController ..> SoundFont : loads instruments.sf2
     Voice *-- Oscillator

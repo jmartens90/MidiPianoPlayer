@@ -7,9 +7,9 @@ import MidiPiano
 // Vereiste 56: 56.meaningful usage of a GUI (not just a screen that shows some text and a textfield)
 // De interface is een speelbaar instrument: een multitouch-pianotoetsenbord (akkoorden, glissando,
 // aanslagsterkte), een keuze uit acht gesamplede instrumenten (vleugel, elektrische piano, orgel,
-// ...) of de eigen synth met vier golfvormen en draaiknoppen voor ADSR, cutoff en volume, een live
+// ...) of de eigen synth met vier golfvormen en draaiknoppen voor ADSR, cutoff, galm en volume, een sustainpedaal, een live
 // OpenGL-oscilloscoop, presets laden en opslaan, een demo-sequencer waarvan de noten oplichten op het
-// toetsenbord, en octaaf-knoppen. Op een gsm staat de app liggend en schermvullend, met een
+// toetsenbord, en octaaf-knoppen. Op een gsm staat de app liggend, met een
 // compacte bovenbalk zodat het toetsenbord zo groot mogelijk is.
 ApplicationWindow {
     id: window
@@ -24,7 +24,6 @@ ApplicationWindow {
     minimumWidth: 640
     minimumHeight: 360
     visible: true
-    visibility: isAndroid ? Window.FullScreen : Window.AutomaticVisibility
     title: qsTr("MidiPianoPlayer")
     color: "#16171d"
 
@@ -93,6 +92,15 @@ ApplicationWindow {
                 text: "+"
                 enabled: window.octaveShift < 3
                 onClicked: window.octaveShift++
+            }
+            Button {
+                // Sustainpedaal: aan = losgelaten noten blijven klinken. Op de computer ook de spatiebalk.
+                text: qsTr("Pedal")
+                checkable: true
+                checked: synth.sustain
+                highlighted: checked
+                focusPolicy: Qt.NoFocus
+                onToggled: synth.sustain = checked
             }
             Label {
                 Layout.fillWidth: true
@@ -190,6 +198,7 @@ ApplicationWindow {
                         { param: "sustain", label: qsTr("Sustain"), from: 0, to: 1, log: false, unit: "", dec: 2 },
                         { param: "release", label: qsTr("Release"), from: 0.01, to: 3, log: true, unit: " s", dec: 2 },
                         { param: "cutoff", label: qsTr("Cutoff"), from: 100, to: 12000, log: true, unit: " Hz", dec: 0 },
+                        { param: "reverb", label: qsTr("Reverb"), from: 0, to: 1, log: false, unit: "", dec: 2 },
                         { param: "volume", label: qsTr("Volume"), from: 0, to: 1, log: false, unit: "", dec: 2 }
                     ]
                     Knob {
@@ -205,8 +214,9 @@ ApplicationWindow {
                         logarithmic: modelData.log
                         unit: modelData.unit
                         decimals: modelData.dec
-                        // Golfvorm, ADSR en cutoff gelden alleen voor de synth; volume voor alles.
-                        enabled: modelData.param === "volume" || window.engine.synthControlsEnabled
+                        // Golfvorm, ADSR en cutoff gelden alleen voor de synth; galm en volume voor alles.
+                        enabled: modelData.param === "volume" || modelData.param === "reverb"
+                                 || window.engine.synthControlsEnabled
                         opacity: enabled ? 1 : 0.35
                     }
                 }
@@ -237,6 +247,7 @@ ApplicationWindow {
             whiteKeyCount: Math.max(8, Math.min(29, Math.floor(width / 44)))
             onNotePressed: (note, velocity) => synth.noteOn(note, velocity)
             onNoteReleased: (note) => synth.noteOff(note)
+            onPedalChanged: (down) => synth.sustain = down
         }
     }
 }

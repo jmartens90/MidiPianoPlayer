@@ -80,6 +80,12 @@ void SynthController::noteOff(int note) { synth_.noteOff(toMidiByte(note)); }
 
 void SynthController::allNotesOff() { synth_.allNotesOff(); }
 
+void SynthController::setSustain(bool down) {
+  if (down == synth_.sustain()) return;
+  synth_.setSustain(down);
+  emit sustainChanged();
+}
+
 double SynthController::param(const QString& name) const {
   try {
     return synth_.patch().get(name.toStdString());

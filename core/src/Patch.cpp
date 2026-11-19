@@ -8,7 +8,8 @@ Patch::Patch() : name_("Init"), waveform_(dsp::Waveform::Saw) {
   // naam, minimum, maximum, standaard
   for (const Param& param : {Param("attack", 0.001f, 2.0f, 0.01f), Param("decay", 0.01f, 2.0f, 0.3f),
                              Param("sustain", 0.0f, 1.0f, 0.6f), Param("release", 0.01f, 3.0f, 0.4f),
-                             Param("cutoff", 100.0f, 12000.0f, 3000.0f), Param("volume", 0.0f, 1.0f, 0.7f)}) {
+                             Param("cutoff", 100.0f, 12000.0f, 3000.0f), Param("volume", 0.0f, 1.0f, 0.7f),
+                             Param("reverb", 0.0f, 1.0f, 0.25f)}) {
     params_.emplace(param.name(), param);
   }
 }

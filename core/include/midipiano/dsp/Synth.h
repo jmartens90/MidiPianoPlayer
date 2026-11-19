@@ -1,6 +1,7 @@
 #ifndef MIDIPIANO_DSP_SYNTH_H
 #define MIDIPIANO_DSP_SYNTH_H
 
+#include <bitset>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -9,6 +10,7 @@
 #include <vector>
 
 #include "midipiano/dsp/Instrument.h"
+#include "midipiano/dsp/Reverb.h"
 #include "midipiano/midi/MidiMessage.h"
 #include "midipiano/preset/Patch.h"
 #include "midipiano/util/RingBuffer.h"
@@ -39,6 +41,11 @@ class Synth {
   void noteOff(std::uint8_t note);
   void allNotesOff();
 
+  // Sustainpedaal (MIDI CC 64): zolang het ingedrukt is, blijven losgelaten noten klinken. Bij het
+  // loslaten van het pedaal stoppen ze allemaal, behalve de toetsen die je nog vasthoudt.
+  void setSustain(bool down);
+  bool sustain() const;
+
   void render(float* out, std::size_t frames);
   void render(std::vector<float>& buffer);
 
@@ -64,6 +71,9 @@ class Synth {
   preset::Patch patch_;
   float sampleRate_;
   std::vector<float> scratch_;
+  Reverb reverb_;
+  bool sustain_ = false;
+  std::bitset<128> sustained_;  // noten die losgelaten zijn maar door het pedaal blijven klinken
   util::RingBuffer<float> scope_{kScopeSize};
 };
 

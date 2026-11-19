@@ -7,9 +7,10 @@
 
 namespace midipiano::dsp {
 
-Synth::Synth(float sampleRate) : sampleRate_(sampleRate) {
+Synth::Synth(float sampleRate) : sampleRate_(sampleRate), reverb_(sampleRate) {
   instruments_.push_back(std::make_unique<VoiceSynth>(sampleRate));  // instrument 0: de synth
   scratch_.resize(4096);
+  reverb_.setAmount(patch_.get("reverb"));
 }
 
 void Synth::handle(const midi::MidiMessage& message) {
@@ -17,6 +18,8 @@ void Synth::handle(const midi::MidiMessage& message) {
     noteOn(message.note(), message.velocity());
   } else if (message.isNoteOff()) {
     noteOff(message.note());
+  } else if (message.type() == 0xB0 && message.note() == 64) {  // CC 64 = sustainpedaal
+    setSustain(message.velocity() >= 64);
   } else if (message.type() == 0xB0 && message.note() == 123) {  // CC 123 = All Notes Off
     allNotesOff();
   }
@@ -24,18 +27,40 @@ void Synth::handle(const midi::MidiMessage& message) {
 
 void Synth::noteOn(std::uint8_t note, std::uint8_t velocity) {
   std::lock_guard<std::mutex> lock(mutex_);
+  if (note < sustained_.size()) sustained_.reset(note);  // opnieuw aangeslagen: toets is weer ingedrukt
   instruments_[current_]->noteOn(note, velocity);
 }
 
 void Synth::noteOff(std::uint8_t note) {
   std::lock_guard<std::mutex> lock(mutex_);
+  if (sustain_ && note < sustained_.size()) {
+    sustained_.set(note);  // pedaal ingedrukt: de noot blijft klinken tot het pedaal los komt
+    return;
+  }
   // Aan alle instrumenten: een noot die nog op het vorige instrument werd gestart, moet ook stoppen.
   for (const auto& instrument : instruments_) instrument->noteOff(note);
 }
 
 void Synth::allNotesOff() {
   std::lock_guard<std::mutex> lock(mutex_);
+  sustained_.reset();
   for (const auto& instrument : instruments_) instrument->allNotesOff();
+}
+
+void Synth::setSustain(bool down) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  sustain_ = down;
+  if (down) return;
+  for (std::size_t note = 0; note < sustained_.size(); ++note) {
+    if (!sustained_.test(note)) continue;
+    for (const auto& instrument : instruments_) instrument->noteOff(static_cast<std::uint8_t>(note));
+  }
+  sustained_.reset();
+}
+
+bool Synth::sustain() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return sustain_;
 }
 
 void Synth::render(float* out, std::size_t frames) {
@@ -52,6 +77,7 @@ void Synth::render(float* out, std::size_t frames) {
     instrument->render(scratch_.data(), frames);
     for (std::size_t i = 0; i < frames; ++i) out[i] += scratch_[i];
   }
+  reverb_.process(out, frames);  // ook als er geen noten meer zijn: dan sterft de galm uit
   const float volume = patch_.get("volume");
   for (std::size_t i = 0; i < frames; ++i) {
     out[i] = std::tanh(out[i] * volume);  // zachte begrenzing: een vol akkoord clipt niet
@@ -72,6 +98,7 @@ void Synth::scopeSnapshot(std::vector<float>& out) const {
 void Synth::setSampleRate(float sampleRate) {
   std::lock_guard<std::mutex> lock(mutex_);
   sampleRate_ = sampleRate;
+  reverb_.setSampleRate(sampleRate);
   for (const auto& instrument : instruments_) instrument->setSampleRate(sampleRate);
 }
 
@@ -113,6 +140,7 @@ bool Synth::currentUsesPatch() const {
 void Synth::applyPatch(const preset::Patch& patch) {
   std::lock_guard<std::mutex> lock(mutex_);
   patch_ = patch;
+  reverb_.setAmount(patch_.get("reverb"));
   // Vereiste 38: 38.at least 4 useful const references for variables (1/4)
   // instrument is een const-referentie naar elke unique_ptr in de vector: een unique_ptr kan je niet
   // kopieren, en const garandeert dat we de lijst zelf hier niet wijzigen.

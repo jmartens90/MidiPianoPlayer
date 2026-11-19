@@ -7,6 +7,7 @@ add_library(midipiano_core STATIC
   src/MidiMessage.cpp
   src/Patch.cpp
   src/PresetStore.cpp
+  src/Reverb.cpp
   src/Synth.cpp
   src/Voice.cpp
   src/SoundFont.cpp

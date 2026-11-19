@@ -12,6 +12,7 @@ Item {
 
     signal notePressed(int note, int velocity)
     signal noteReleased(int note)
+    signal pedalChanged(bool down)
 
     readonly property var whiteOffsets: [0, 2, 4, 5, 7, 9, 11]
     readonly property var hasBlackRight: [true, true, false, true, true, true, false]
@@ -91,6 +92,12 @@ Item {
     onWhiteKeyCountChanged: releaseAll()
 
     Keys.onPressed: (event) => {
+        if (event.key === Qt.Key_Space) {   // spatiebalk = sustainpedaal
+            if (!event.isAutoRepeat)
+                root.pedalChanged(true)
+            event.accepted = true
+            return
+        }
         const offset = computerKeys[event.text.toLowerCase()]
         if (offset === undefined || event.isAutoRepeat)
             return
@@ -100,6 +107,12 @@ Item {
         event.accepted = true
     }
     Keys.onReleased: (event) => {
+        if (event.key === Qt.Key_Space) {
+            if (!event.isAutoRepeat)
+                root.pedalChanged(false)
+            event.accepted = true
+            return
+        }
         if (event.isAutoRepeat || heldKeys[event.key] === undefined)
             return
         release(heldKeys[event.key])

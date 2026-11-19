@@ -52,6 +52,9 @@ target_link_libraries(MidiPianoPlayer PRIVATE
 set_target_properties(MidiPianoPlayer PROPERTIES
   WIN32_EXECUTABLE ON
   MACOSX_BUNDLE ON
+  # Eigen AndroidManifest.xml: de app start meteen liggend (sensorLandscape). Draaien tijdens het
+  # opstarten liet het Qt-venster op zijn staande maat staan.
+  QT_ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/android"
 )
 
 if(MSVC)

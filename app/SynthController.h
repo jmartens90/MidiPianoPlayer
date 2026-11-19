@@ -35,6 +35,7 @@ class SynthController : public QObject {
   Q_PROPERTY(int instrument READ instrument WRITE setInstrument NOTIFY instrumentChanged)
   Q_PROPERTY(QStringList instrumentNames READ instrumentNames CONSTANT)
   Q_PROPERTY(bool synthControlsEnabled READ synthControlsEnabled NOTIFY instrumentChanged)
+  Q_PROPERTY(bool sustain READ sustain WRITE setSustain NOTIFY sustainChanged)
 
  public:
   explicit SynthController(QObject* parent = nullptr);
@@ -61,6 +62,8 @@ class SynthController : public QObject {
   void setInstrument(int index);
   QStringList instrumentNames() const { return instrumentNames_; }
   bool synthControlsEnabled() const { return synth_.currentUsesPatch(); }
+  bool sustain() const { return synth_.sustain(); }
+  void setSustain(bool down);
 
   void copyScope(std::vector<float>& out) const { synth_.scopeSnapshot(out); }
 
@@ -71,6 +74,7 @@ class SynthController : public QObject {
   void activeVoicesChanged();
   void statusTextChanged();
   void instrumentChanged();
+  void sustainChanged();
   void noteStateChanged(int note, bool on);  // noten van de sequencer, om toetsen te laten oplichten
   void scopeUpdated();
 
