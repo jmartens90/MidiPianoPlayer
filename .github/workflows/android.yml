@@ -22,6 +22,8 @@ jobs:
           target: desktop
           arch: linux_gcc_64
           cache: true
+      - name: Remember the desktop Qt path
+        run: echo "QT_HOST_PATH=$QT_ROOT_DIR" >> "$GITHUB_ENV"
       - name: Install Qt for Android
         uses: jurplel/install-qt-action@v4
         with:
@@ -38,6 +40,7 @@ jobs:
         run: |
           "$QT_ROOT_DIR/bin/qt-cmake" -S . -B build-android -G Ninja \
             -DCMAKE_BUILD_TYPE=Debug \
+            -DQT_HOST_PATH="$QT_HOST_PATH" \
             -DANDROID_SDK_ROOT="$ANDROID_SDK_ROOT" \
             -DANDROID_NDK_ROOT="$ANDROID_NDK_ROOT"
       - name: Build APK
