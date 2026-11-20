@@ -37,6 +37,15 @@ ApplicationWindow {
         id: synth
     }
 
+    // App naar de achtergrond: ingedrukte toetsen loslaten (de vinger komt nooit meer "los").
+    Connections {
+        target: Qt.application
+        function onStateChanged() {
+            if (Qt.application.state !== Qt.ApplicationActive)
+                keyboard.releaseAll()
+        }
+    }
+
     Connections {
         target: synth
         function onNoteStateChanged(note, on) { keyboard.setLit(note, on) }

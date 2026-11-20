@@ -1,6 +1,7 @@
 #include "SynthController.h"
 
 #include <QFile>
+#include <QGuiApplication>
 #include <QMetaObject>
 #include <QStandardPaths>
 
@@ -47,6 +48,10 @@ SynthController::SynthController(QObject* parent)
   // van de scope, en de scope niets van de timer.
   connect(tick_, &QTimer::timeout, this, &SynthController::onTick);
 
+  // App naar de achtergrond (home-knop, andere app): alles stilzetten en de geluidskaart vrijgeven.
+  // Op de desktop gebeurt dat alleen bij minimaliseren; een ander venster aanklikken laat de klank aan.
+  connect(qGuiApp, &QGuiApplication::applicationStateChanged, this, &SynthController::onApplicationStateChanged);
+
   // Bluetooth-noten volgen dezelfde weg als die van de demo-sequencer (polymorfie via MidiSource).
   bluetooth_->start([this](const midi::MidiMessage& message) { onSourceMessage(message); });
   tick_->start(33);
@@ -54,6 +59,20 @@ SynthController::SynthController(QObject* parent)
 
 SynthController::~SynthController() {
   if (source_) source_->stop();  // eerst de sequencer-thread stoppen, dan pas de synth afbreken
+}
+
+void SynthController::onApplicationStateChanged(Qt::ApplicationState state) {
+  if (state == Qt::ApplicationSuspended || state == Qt::ApplicationHidden) {
+    if (source_ && source_->isRunning()) {
+      source_->stop();
+      emit sequencerRunningChanged();
+    }
+    setSustain(false);
+    synth_.allNotesOff();
+    if (audio_) audio_->pause();
+  } else if (state == Qt::ApplicationActive) {
+    if (audio_) audio_->resume();
+  }
 }
 
 QString SynthController::audioInfo() const {

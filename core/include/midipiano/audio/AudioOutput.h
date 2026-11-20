@@ -30,6 +30,11 @@ class AudioOutput {
   AudioOutput(const AudioOutput&) = delete;
   AudioOutput& operator=(const AudioOutput&) = delete;
 
+  // Geluidskaart even stilleggen (app op de achtergrond) en weer starten.
+  void pause();
+  void resume();
+  bool isPaused() const { return paused_; }
+
   float sampleRate() const;
   unsigned int bufferFrames() const;
 
@@ -38,6 +43,7 @@ class AudioOutput {
 
   dsp::Synth& synth_;
   std::unique_ptr<ma_device> device_;
+  bool paused_ = false;
 };
 
 }  // namespace midipiano::audio

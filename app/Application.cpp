@@ -25,6 +25,13 @@ int Application::run() {
 #else
   engine_.load(QUrl(QStringLiteral("qrc:/MidiPiano/qml/Main.qml")));
 #endif
+#ifdef Q_OS_ANDROID
+  // Op een gsm schermvullend ("immersive"): geen doorschijnende statusbalk bovenaan en geen terug- en
+  // home-knoppen over het toetsenbord. Vanaf de rand vegen toont ze even.
+  if (!engine_.rootObjects().isEmpty()) {
+    if (auto* window = qobject_cast<QQuickWindow*>(engine_.rootObjects().constFirst())) window->showFullScreen();
+  }
+#endif
   return app_.exec();
 }
 

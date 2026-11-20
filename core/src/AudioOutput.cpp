@@ -42,6 +42,17 @@ AudioOutput::AudioOutput(dsp::Synth& synth) : synth_(synth), device_(std::make_u
 
 AudioOutput::~AudioOutput() { ma_device_uninit(device_.get()); }
 
+void AudioOutput::pause() {
+  if (paused_) return;
+  ma_device_stop(device_.get());
+  paused_ = true;
+}
+
+void AudioOutput::resume() {
+  if (!paused_) return;
+  if (ma_device_start(device_.get()) == MA_SUCCESS) paused_ = false;
+}
+
 float AudioOutput::sampleRate() const { return static_cast<float>(device_->sampleRate); }
 
 unsigned int AudioOutput::bufferFrames() const { return device_->playback.internalPeriodSizeInFrames; }

@@ -87,6 +87,7 @@ class SynthController : public QObject {
 
  private slots:
   void onTick();
+  void onApplicationStateChanged(Qt::ApplicationState state);
 
  private:
   void onSourceMessage(const midi::MidiMessage& message);

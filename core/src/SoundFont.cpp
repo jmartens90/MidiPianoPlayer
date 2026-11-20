@@ -1,6 +1,7 @@
 #include "midipiano/dsp/SoundFont.h"
 
 #include <tsf.h>
+#include <tsf_extra.h>
 
 #include <algorithm>
 #include <fstream>
@@ -46,11 +47,21 @@ SoundFontInstrument::SoundFontInstrument(std::shared_ptr<const SoundFont> font, 
 
 SoundFontInstrument::~SoundFontInstrument() { tsf_close(voices_); }
 
+
 void SoundFontInstrument::noteOn(std::uint8_t note, std::uint8_t velocity) {
+  // Dezelfde toets opnieuw aanslaan terwijl hij nog klinkt (bv. met het sustainpedaal, of toets +
+  // sequencer tegelijk): eerst de oude noot loslaten. Anders staan er twee stemmen op dezelfde toets
+  // en laat de volgende noteOff er maar een los, waarna de andere eeuwig blijft hangen.
+  noteOff(note);
   tsf_note_on(voices_, presetIndex_, note, static_cast<float>(velocity) / 127.0f);
 }
 
-void SoundFontInstrument::noteOff(std::uint8_t note) { tsf_note_off(voices_, presetIndex_, note); }
+void SoundFontInstrument::noteOff(std::uint8_t note) {
+  // tsf_note_off laat per oproep alleen de oudste aanslag van die toets los. Herhalen tot er geen
+  // vastgehouden stem meer is (hooguit een paar keer).
+  for (int i = 0; i < 8 && tsf_held_voice_count(voices_, presetIndex_, note) > 0; ++i)
+    tsf_note_off(voices_, presetIndex_, note);
+}
 
 void SoundFontInstrument::allNotesOff() { tsf_note_off_all(voices_); }
 

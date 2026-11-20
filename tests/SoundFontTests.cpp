@@ -57,3 +57,33 @@ TEST(instruments_share_one_soundfont) {
   CHECK(font.use_count() == 2);
   CHECK(organ->name() == "Pipe Organ");
 }
+
+// Regressietest voor een hangende noot: met het pedaal dezelfde toets twee keer aanslaan gaf twee
+// stemmen op een toets, en het loslaten van het pedaal liet er maar een los.
+TEST(restruck_piano_note_never_hangs) {
+  dsp::Synth synth(22050.0f);
+  const auto font = dsp::SoundFont::fromFile(MIDIPIANO_SOUNDFONT);
+  synth.selectInstrument(synth.addInstrument(std::make_unique<dsp::SoundFontInstrument>(font, 0, 22050.0f)));
+  synth.setSustain(true);
+  synth.noteOn(60);
+  synth.noteOff(60);
+  synth.noteOn(60);
+  synth.noteOff(60);
+  synth.setSustain(false);
+  synth.noteOn(64);  // twee aanslagen, een noteOff
+  synth.noteOn(64);
+  synth.noteOff(64);
+  std::vector<float> tail(22050 * 4);
+  synth.render(tail);
+  CHECK(synth.activeVoiceCount() == 0);
+}
+
+TEST(switching_instrument_releases_held_notes) {
+  dsp::Synth synth(22050.0f);
+  synth.noteOn(60);  // op de synth, en de noteOff "gaat verloren"
+  const auto font = dsp::SoundFont::fromFile(MIDIPIANO_SOUNDFONT);
+  synth.selectInstrument(synth.addInstrument(std::make_unique<dsp::SoundFontInstrument>(font, 0, 22050.0f)));
+  std::vector<float> tail(22050 * 2);
+  synth.render(tail);
+  CHECK(synth.activeVoiceCount() == 0);
+}

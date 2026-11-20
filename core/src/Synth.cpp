@@ -117,7 +117,12 @@ std::size_t Synth::addInstrument(std::unique_ptr<Instrument> instrument) {
 
 void Synth::selectInstrument(std::size_t index) {
   std::lock_guard<std::mutex> lock(mutex_);
-  if (index < instruments_.size()) current_ = index;
+  if (index >= instruments_.size() || index == current_) return;
+  // Wat op het oude instrument nog vastgehouden wordt, loslaten (het klinkt nog natuurlijk uit). Zo
+  // kan een noot waarvan de noteOff verloren ging nooit blijven hangen na het wisselen.
+  instruments_[current_]->allNotesOff();
+  sustained_.reset();
+  current_ = index;
 }
 
 std::size_t Synth::currentInstrument() const {
