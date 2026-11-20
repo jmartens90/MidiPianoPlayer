@@ -190,3 +190,17 @@ TEST(step_sequencer_plays_active_steps_in_time) {
   CHECK(received[1].isNoteOff());
   CHECK(received[2] == midi::MidiMessage::noteOn(0, 76, 90));
 }
+
+TEST(scheduled_note_starts_on_the_exact_sample) {
+  dsp::Synth synth(10000.0f);
+  preset::Patch patch = synth.patch();
+  patch.set("reverb", 0.0f).set("attack", 0.001f);
+  synth.applyPatch(patch);
+  const auto blockStart = dsp::Synth::Clock::now();
+  // 25 ms na het begin van het blok = sample 250 bij 10 kHz.
+  synth.schedule(midi::MidiMessage::noteOn(0, 69, 120), blockStart + std::chrono::milliseconds(25));
+  std::vector<float> buffer(1000);
+  synth.render(buffer.data(), buffer.size(), blockStart);
+  CHECK(peakOf(std::vector<float>(buffer.begin(), buffer.begin() + 249)) == 0.0f);
+  CHECK(peakOf(std::vector<float>(buffer.begin() + 250, buffer.begin() + 400)) > 0.01f);
+}

@@ -6,8 +6,11 @@
 #include <QStringList>
 #include <QtQml/qqmlregistration.h>
 
+#include <chrono>
+#include <functional>
 #include <vector>
 
+#include "midipiano/midi/BleClockSync.h"
 #include "midipiano/midi/BleMidiParser.h"
 #include "midipiano/midi/MidiSource.h"
 
@@ -60,6 +63,11 @@ class BleMidiSource : public QObject, public midi::MidiSource {
   QString statusText() const { return statusText_; }
   int messageCount() const { return messageCount_; }
 
+  // Met tijdstempels: elk bericht gaat met het lokale tijdstip waarop het (volgens de zender) gespeeld
+  // werd naar buiten, zodat de synth het met een vaste vertraging en zonder Bluetooth-jitter speelt.
+  using TimedCallback = std::function<void(const midi::MidiMessage&, std::chrono::steady_clock::time_point)>;
+  void setTimedOutput(TimedCallback output) { timedOutput_ = std::move(output); }
+
   // Voor een pakket dat binnenkomt (ook bruikbaar zonder Bluetooth-hardware).
   void handlePacket(const QByteArray& packet);
 
@@ -76,7 +84,9 @@ class BleMidiSource : public QObject, public midi::MidiSource {
   void setConnected(bool connected, const QString& name = {});
 
   Callback onMessage_;
+  TimedCallback timedOutput_;
   midi::BleMidiParser parser_;
+  midi::BleClockSync clockSync_;
   QStringList deviceNames_;
   QString statusText_;
   QString connectedName_;

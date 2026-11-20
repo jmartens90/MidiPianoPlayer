@@ -111,6 +111,19 @@ message as a notification in the BLE MIDI packet format: `[header] [timestamp] [
 `BleMidiParser` (tested in `tests/BleMidiTests.cpp`, no hardware needed) handles running status,
 several messages per packet, realtime bytes and SysEx.
 
+### Timing and latency
+
+From a key press on the PSoC 6 to sound is roughly 20 to 35 ms. To keep the rhythm tight:
+
+* The app asks for a short Bluetooth connection interval (7.5 to 15 ms) once it is connected.
+* Every BLE MIDI message carries a 13-bit millisecond timestamp. `BleClockSync` maps it to the
+  phone's clock, so notes the PSoC sent 10 ms apart play exactly 10 ms apart, even when the radio
+  delivers them unevenly ("Steady Bluetooth timing" in Settings; off = play on arrival).
+* The synth plans notes on an exact sample inside the audio block (`Synth::schedule`), and the step
+  sequencer sends its notes one audio block ahead, so its timing no longer depends on the buffer size.
+* **Settings → Buffer** chooses the audio buffer: Auto, 5, 10 or 20 ms. Smaller responds faster but
+  needs a faster phone.
+
 ## Using the app
 
 | Control | What it does |
@@ -131,7 +144,7 @@ several messages per packet, realtime bytes and SysEx.
 | Volume | Master volume |
 | Pedal | Sustain pedal: released notes keep ringing until you turn it off. On a PC you can also hold the space bar |
 | Octave − / + | Shift the keyboard from C0 to C6 |
-| ⚙ (Settings) | Bluetooth MIDI (search, connect, disconnect), audio info and keyboard help. A blue dot means a Bluetooth device is connected |
+| ⚙ (Settings) | Bluetooth MIDI (search, connect, disconnect), audio buffer size, steady Bluetooth timing, audio info and keyboard help. A blue dot means a Bluetooth device is connected |
 | Preset list / Save | (Synth only) Load a preset, or save the current synth sound under a name |
 | Play demo | Starts the demo sequencer (an Am - F - C - G arpeggio) |
 

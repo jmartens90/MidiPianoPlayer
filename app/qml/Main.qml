@@ -230,6 +230,32 @@ ApplicationWindow {
 
                 Label { text: qsTr("Audio"); font.bold: true; font.pixelSize: 15; Layout.topMargin: 10 }
                 Label { text: synth.audioInfo; opacity: 0.75 }
+                RowLayout {
+                    Layout.fillWidth: true
+                    Label { text: qsTr("Buffer"); Layout.fillWidth: true }
+                    ComboBox {
+                        id: bufferBox
+                        focusPolicy: Qt.NoFocus
+                        readonly property var values: [0, 5, 10, 20]
+                        model: [qsTr("Auto"), "5 ms", "10 ms", "20 ms"]
+                        currentIndex: Math.max(0, values.indexOf(synth.bufferMs))
+                        onActivated: (i) => synth.bufferMs = values[i]
+                    }
+                }
+                Label {
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    opacity: 0.6
+                    font.pixelSize: 12
+                    text: qsTr("Smaller is faster to respond, but crackles sooner on a slow phone.")
+                }
+                Switch {
+                    Layout.fillWidth: true
+                    focusPolicy: Qt.NoFocus
+                    text: qsTr("Steady Bluetooth timing")
+                    checked: synth.steadyTiming
+                    onToggled: synth.steadyTiming = checked
+                }
 
                 Label { text: qsTr("Keyboard"); font.bold: true; font.pixelSize: 15; Layout.topMargin: 10 }
                 Label {

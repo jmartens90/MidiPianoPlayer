@@ -12,7 +12,8 @@ namespace midipiano::audio {
 // lage latency, laten miniaudio de samplerate kiezen, en miniaudio roept vanaf zijn eigen
 // audio-thread dataCallback() op telkens de geluidskaart een nieuw blok samples nodig heeft.
 // Een tweede externe bibliotheek, TinySoundFont, speelt de pianosamples af (zie SoundFont.cpp).
-AudioOutput::AudioOutput(dsp::Synth& synth) : synth_(synth), device_(std::make_unique<ma_device>()) {
+AudioOutput::AudioOutput(dsp::Synth& synth, unsigned int periodMs)
+    : synth_(synth), device_(std::make_unique<ma_device>()) {
   ma_device_config config = ma_device_config_init(ma_device_type_playback);
   config.playback.format = ma_format_f32;
   config.playback.channels = 1;
@@ -21,8 +22,9 @@ AudioOutput::AudioOutput(dsp::Synth& synth) : synth_(synth), device_(std::make_u
 #ifdef __ANDROID__
   // Op een gsm mag de buffer iets groter zijn: 10 ms per blok geeft de CPU genoeg tijd voor een
   // volle akkoord met galm, zonder te kraken. Merkbare vertraging is dat nog niet.
-  config.periodSizeInMilliseconds = 10;
+  if (periodMs == 0) periodMs = 10;
 #endif
+  if (periodMs > 0) config.periodSizeInMilliseconds = periodMs;  // gekozen in Instellingen
   config.dataCallback = &AudioOutput::dataCallback;
   // Vereiste 28: 28.useful usage of "this" (if the code does not work without it)
   // miniaudio is een C-bibliotheek: de callback is een gewone (statische) functie zonder object.

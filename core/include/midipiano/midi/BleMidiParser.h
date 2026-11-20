@@ -24,6 +24,13 @@ namespace midipiano::midi {
 // Hij onthoudt de running status tussen pakketten, zoals de specificatie vraagt.
 class BleMidiParser {
  public:
+  // Een bericht met de tijdstempel van de zender: milliseconden, 13 bits (loopt rond na 8192 ms).
+  struct TimedMessage {
+    MidiMessage message;
+    int timestampMs;
+  };
+
+  std::vector<TimedMessage> parseTimed(const std::uint8_t* data, std::size_t length);
   std::vector<MidiMessage> parse(const std::uint8_t* data, std::size_t length);
   std::vector<MidiMessage> parse(const std::vector<std::uint8_t>& packet) {
     return parse(packet.data(), packet.size());

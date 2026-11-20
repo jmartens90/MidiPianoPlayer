@@ -69,6 +69,12 @@ void StepSequencer::setBpm(float bpm) { bpm_ = std::clamp(bpm, 30.0f, 300.0f); }
 void StepSequencer::setGate(float gate) { gate_ = std::clamp(gate, 0.1f, 1.0f); }
 void StepSequencer::setSwing(float swing) { swing_ = std::clamp(swing, 0.0f, 0.6f); }
 
+void StepSequencer::setTimedOutput(TimedCallback output, std::chrono::milliseconds lookahead) {
+  if (running_) return;
+  timedOutput_ = std::move(output);
+  lookahead_ = timedOutput_ ? lookahead : std::chrono::milliseconds(0);
+}
+
 bool StepSequencer::waitUntil(std::chrono::steady_clock::time_point time) {
   std::unique_lock<std::mutex> lock(waitMutex_);
   return !wakeUp_.wait_until(lock, time, [this] { return !running_; });
@@ -85,16 +91,21 @@ void StepSequencer::run(Callback onMessage) {
     const float swingDelay = (index % 2 == 1) ? swing_ * stepSeconds * 0.5f : 0.0f;
     const auto noteStart = stepStart + std::chrono::duration_cast<Clock::duration>(
                                            std::chrono::duration<float>(swingDelay));
-    if (!waitUntil(noteStart)) break;
+    // Met een getimede uitgang sturen we lookahead_ te vroeg, met het echte tijdstip erbij.
+    auto send = [&](const MidiMessage& message, Clock::time_point when) {
+      if (timedOutput_) timedOutput_(message, when);
+      else onMessage(message);
+    };
+    if (!waitUntil(noteStart - lookahead_)) break;
 
     currentStep_ = static_cast<int>(index);
     const int note = std::clamp(static_cast<int>(current.note) + transpose_.load(), 0, 127);
-    if (current.active) onMessage(MidiMessage::noteOn(0, static_cast<std::uint8_t>(note), current.accent ? 127 : 90));
+    if (current.active) send(MidiMessage::noteOn(0, static_cast<std::uint8_t>(note), current.accent ? 127 : 90), noteStart);
 
     const auto noteEnd = noteStart + std::chrono::duration_cast<Clock::duration>(
                                          std::chrono::duration<float>(stepSeconds * gate_ * 0.95f));
-    const bool keepGoing = waitUntil(noteEnd);
-    if (current.active) onMessage(MidiMessage::noteOff(0, static_cast<std::uint8_t>(note)));
+    const bool keepGoing = waitUntil(noteEnd - lookahead_);
+    if (current.active) send(MidiMessage::noteOff(0, static_cast<std::uint8_t>(note)), noteEnd);
     if (!keepGoing) break;
 
     stepStart += std::chrono::duration_cast<Clock::duration>(std::chrono::duration<float>(stepSeconds));

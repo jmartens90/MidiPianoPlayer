@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <functional>
 
 #include "midipiano/dsp/VoiceSynth.h"
 
@@ -15,25 +16,43 @@ Synth::Synth(float sampleRate) : sampleRate_(sampleRate), delay_(sampleRate), re
 }
 
 void Synth::handle(const midi::MidiMessage& message) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  handleLocked(message);
+}
+
+void Synth::handleLocked(const midi::MidiMessage& message) {
   if (message.isNoteOn()) {
-    noteOn(message.note(), message.velocity());
+    noteOnLocked(message.note(), message.velocity());
   } else if (message.isNoteOff()) {
-    noteOff(message.note());
+    noteOffLocked(message.note());
   } else if (message.type() == 0xB0 && message.note() == 64) {  // CC 64 = sustainpedaal
-    setSustain(message.velocity() >= 64);
+    setSustainLocked(message.velocity() >= 64);
   } else if (message.type() == 0xB0 && message.note() == 123) {  // CC 123 = All Notes Off
-    allNotesOff();
+    allNotesOffLocked();
   }
+}
+
+void Synth::schedule(const midi::MidiMessage& message, Clock::time_point when) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  scheduled_.push({when, scheduleCounter_++, message});
 }
 
 void Synth::noteOn(std::uint8_t note, std::uint8_t velocity) {
   std::lock_guard<std::mutex> lock(mutex_);
+  noteOnLocked(note, velocity);
+}
+
+void Synth::noteOnLocked(std::uint8_t note, std::uint8_t velocity) {
   if (note < sustained_.size()) sustained_.reset(note);  // opnieuw aangeslagen: toets is weer ingedrukt
   instruments_[current_]->noteOn(note, velocity);
 }
 
 void Synth::noteOff(std::uint8_t note) {
   std::lock_guard<std::mutex> lock(mutex_);
+  noteOffLocked(note);
+}
+
+void Synth::noteOffLocked(std::uint8_t note) {
   if (sustain_ && note < sustained_.size()) {
     sustained_.set(note);  // pedaal ingedrukt: de noot blijft klinken tot het pedaal los komt
     return;
@@ -44,12 +63,21 @@ void Synth::noteOff(std::uint8_t note) {
 
 void Synth::allNotesOff() {
   std::lock_guard<std::mutex> lock(mutex_);
+  allNotesOffLocked();
+}
+
+void Synth::allNotesOffLocked() {
   sustained_.reset();
+  while (!scheduled_.empty()) scheduled_.pop();  // geplande noten vervallen ook
   for (const auto& instrument : instruments_) instrument->allNotesOff();
 }
 
 void Synth::setSustain(bool down) {
   std::lock_guard<std::mutex> lock(mutex_);
+  setSustainLocked(down);
+}
+
+void Synth::setSustainLocked(bool down) {
   sustain_ = down;
   if (down) return;
   for (std::size_t note = 0; note < sustained_.size(); ++note) {
@@ -64,10 +92,7 @@ bool Synth::sustain() const {
   return sustain_;
 }
 
-void Synth::render(float* out, std::size_t frames) {
-  std::lock_guard<std::mutex> lock(mutex_);
-  if (scratch_.size() < frames) scratch_.resize(frames);  // gebeurt hooguit een keer
-  std::fill(out, out + frames, 0.0f);
+void Synth::renderInstruments(float* out, std::size_t frames) {
   // Vereiste 5: 5.useful and correct polymorphism (explain why)
   // instruments_ bevat zowel de VoiceSynth als SoundFontInstruments (piano, orgel, ...), allemaal
   // via een Instrument-pointer. render() roept bij elk dezelfde virtuele functie op en C++ kiest
@@ -78,6 +103,38 @@ void Synth::render(float* out, std::size_t frames) {
     instrument->render(scratch_.data(), frames);
     for (std::size_t i = 0; i < frames; ++i) out[i] += scratch_[i];
   }
+}
+
+void Synth::render(float* out, std::size_t frames) {
+  render(out, frames, Clock::now());
+}
+
+void Synth::render(float* out, std::size_t frames, Clock::time_point blockStart) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (scratch_.size() < frames) scratch_.resize(frames);  // gebeurt hooguit een keer
+  std::fill(out, out + frames, 0.0f);
+
+  // Geplande noten (Bluetooth met tijdstempels, step sequencer) starten op het juiste sample binnen
+  // dit blok in plaats van aan het begin van het volgende blok. Zonder dit schuift elke noot 0 tot
+  // 10 ms (een blok) op, en dat hoor je als een onregelmatig ritme. We knippen het blok daarom op
+  // bij elk gepland bericht: eerst renderen tot dat sample, dan het bericht toepassen, verder renderen.
+  const double samplesPerSecond = sampleRate_;
+  auto sampleIndexOf = [&](Clock::time_point when) -> std::size_t {
+    const double seconds = std::chrono::duration<double>(when - blockStart).count();
+    if (seconds <= 0.0) return 0;
+    return static_cast<std::size_t>(std::min<double>(seconds * samplesPerSecond, static_cast<double>(frames)));
+  };
+  std::size_t position = 0;
+  while (position < frames) {
+    while (!scheduled_.empty() && sampleIndexOf(scheduled_.top().when) <= position) {
+      handleLocked(scheduled_.top().message);
+      scheduled_.pop();
+    }
+    const std::size_t next = scheduled_.empty() ? frames : std::max(position + 1, sampleIndexOf(scheduled_.top().when));
+    renderInstruments(out + position, next - position);
+    position = next;
+  }
+
   delay_.process(out, frames);    // echo voor de galm: de echo's krijgen ook galm
   reverb_.process(out, frames);  // ook als er geen noten meer zijn: dan sterft de galm uit
   const float volume = patch_.get("volume");

@@ -4,7 +4,9 @@
 #include <array>
 #include <atomic>
 #include <condition_variable>
+#include <chrono>
 #include <cstdint>
+#include <functional>
 #include <mutex>
 #include <thread>
 
@@ -28,6 +30,8 @@ class StepSequencer final : public MidiSource {
     bool accent = false;
   };
   using Pattern = std::array<Step, kSteps>;
+  using Clock = std::chrono::steady_clock;
+  using TimedCallback = std::function<void(const MidiMessage&, Clock::time_point)>;
 
   StepSequencer();
   ~StepSequencer() override;
@@ -56,6 +60,11 @@ class StepSequencer final : public MidiSource {
 
   int currentStep() const { return currentStep_; }  // -1 als hij stilstaat
 
+  // Vooruit plannen: elk bericht gaat "lookahead" te vroeg naar buiten, samen met het exacte tijdstip
+  // waarop het moet klinken (Synth::schedule). Zo speelt de synth het op het juiste sample, los van
+  // de grootte van de audioblokken. Instellen voor start().
+  void setTimedOutput(TimedCallback output, std::chrono::milliseconds lookahead);
+
   static Pattern defaultPattern();
 
  private:
@@ -70,6 +79,8 @@ class StepSequencer final : public MidiSource {
   std::atomic<int> transpose_{0};
   std::atomic<int> currentStep_{-1};
   std::atomic<bool> running_{false};
+  TimedCallback timedOutput_;
+  std::chrono::milliseconds lookahead_{0};
   std::thread thread_;
   std::mutex waitMutex_;
   std::condition_variable wakeUp_;

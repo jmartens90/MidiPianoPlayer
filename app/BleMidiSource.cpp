@@ -5,6 +5,7 @@
 #ifdef MIDIPIANO_HAS_BLUETOOTH
 #include <QBluetoothDeviceDiscoveryAgent>
 #include <QBluetoothUuid>
+#include <QLowEnergyConnectionParameters>
 #include <QLowEnergyController>
 #include <QLowEnergyService>
 #if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
@@ -71,10 +72,12 @@ void BleMidiSource::setConnected(bool connected, const QString& name) {
 // BleMidiParser (core, getest zonder hardware) zet ze om in MidiMessages, en die gaan via dezelfde
 // callback als de demo-sequencer naar de synth. Zo speelt de hardware rechtstreeks op de gsm.
 void BleMidiSource::handlePacket(const QByteArray& packet) {
+  const auto arrival = std::chrono::steady_clock::now();
   const auto* bytes = reinterpret_cast<const std::uint8_t*>(packet.constData());
-  for (const midi::MidiMessage& message : parser_.parse(bytes, static_cast<std::size_t>(packet.size()))) {
+  for (const auto& timed : parser_.parseTimed(bytes, static_cast<std::size_t>(packet.size()))) {
     ++messageCount_;
-    if (onMessage_) onMessage_(message);
+    if (timedOutput_) timedOutput_(timed.message, clockSync_.toLocal(timed.timestampMs, arrival));
+    else if (onMessage_) onMessage_(timed.message);
   }
   emit messageCountChanged();
 }
@@ -172,6 +175,13 @@ void BleMidiSource::connectTo(int index) {
       if (state == QLowEnergyService::RemoteServiceDiscovered) {
         onServiceDiscovered();
         if (connected_ || !service_) return;
+        // Vraag de kortste verbindingsinterval (7,5 tot 15 ms): Bluetooth stuurt alleen op die momenten,
+        // dus dit bepaalt het grootste deel van de vertraging. Op Android wordt dat "high priority".
+        QLowEnergyConnectionParameters parameters;
+        parameters.setIntervalRange(7.5, 15.0);
+        parameters.setLatency(0);
+        parameters.setSupervisionTimeout(2000);
+        controller_->requestConnectionUpdate(parameters);
         setConnected(true, name);
         setStatus(tr("Connected to %1. Play on it!").arg(name));
       }
@@ -211,6 +221,7 @@ void BleMidiSource::onServiceDiscovered() {
 
 void BleMidiSource::releaseController() {
   parser_.reset();
+  clockSync_.reset();
   if (service_) {
     service_->deleteLater();
     service_ = nullptr;

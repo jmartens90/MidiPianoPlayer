@@ -2,10 +2,13 @@
 #define MIDIPIANO_DSP_SYNTH_H
 
 #include <bitset>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <mutex>
+#include <queue>
 #include <string>
 #include <vector>
 
@@ -31,9 +34,14 @@ class Synth {
  public:
   static constexpr std::size_t kScopeSize = 1024;
 
+  using Clock = std::chrono::steady_clock;
+
   explicit Synth(float sampleRate = 48000.0f);
 
   void handle(const midi::MidiMessage& message);
+  // Plant een bericht op een exact tijdstip: render() past het toe op het juiste sample van het blok
+  // dat dat tijdstip bevat. Voor bronnen die vooruit weten wanneer een noot moet klinken.
+  void schedule(const midi::MidiMessage& message, Clock::time_point when);
 
   // Vereiste 30: 30.default values in function definition
   // Een toets op het scherm heeft geen aanslagsterkte, dus velocity is standaard 100. De sequencer
@@ -51,6 +59,7 @@ class Synth {
   void setTempo(float bpm);
 
   void render(float* out, std::size_t frames);
+  void render(float* out, std::size_t frames, Clock::time_point blockStart);
   void render(std::vector<float>& buffer);
 
   void setSampleRate(float sampleRate);
@@ -69,6 +78,23 @@ class Synth {
   std::size_t activeVoiceCount() const;
 
  private:
+  // *Locked: de mutex is al vast (vanuit render() bij geplande berichten, of vanuit de publieke versie).
+  void handleLocked(const midi::MidiMessage& message);
+  void noteOnLocked(std::uint8_t note, std::uint8_t velocity);
+  void noteOffLocked(std::uint8_t note);
+  void allNotesOffLocked();
+  void setSustainLocked(bool down);
+  void renderInstruments(float* out, std::size_t frames);
+
+  struct Scheduled {
+    Clock::time_point when;
+    std::uint64_t order;  // bij gelijke tijd: in volgorde van aankomst
+    midi::MidiMessage message;
+    bool operator>(const Scheduled& other) const {
+      return when != other.when ? when > other.when : order > other.order;
+    }
+  };
+
   void applyReverbSettings();  // patch_ -> reverb_ (mutex moet al vast zijn)
   void applyDelaySettings();   // patch_ + tempo_ -> delay_
 
@@ -81,6 +107,8 @@ class Synth {
   Delay delay_;
   Reverb reverb_;
   float tempo_ = 120.0f;
+  std::priority_queue<Scheduled, std::vector<Scheduled>, std::greater<Scheduled>> scheduled_;
+  std::uint64_t scheduleCounter_ = 0;
   bool sustain_ = false;
   std::bitset<128> sustained_;  // noten die losgelaten zijn maar door het pedaal blijven klinken
   util::RingBuffer<float> scope_{kScopeSize};

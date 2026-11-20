@@ -30,7 +30,8 @@ them on every push.
 | Delay | `delay_repeats_the_sound_at_the_right_time`, `delay_syncs_to_the_sequencer_tempo` | echoes arrive at the set time and get softer; sync uses the tempo |
 | Step sequencer | `step_sequencer_plays_active_steps_in_time` | only active steps play, accent = velocity 127, transpose works, stop is immediate |
 | Hanging notes | `restruck_piano_note_never_hangs`, `switching_instrument_releases_held_notes` | a key struck twice (pedal, sequencer) never keeps sounding |
-| Bluetooth | `ble_parser_*` (4 tests) | BLE MIDI packets: several messages, running status (also across packets), realtime and SysEx skipped, bad packets ignored |
+| Bluetooth | `ble_parser_*` (5 tests) | BLE MIDI packets: several messages, running status (also across packets), realtime and SysEx skipped, bad packets ignored, 13-bit timestamps and their wraparound |
+| Timing | `scheduled_note_starts_on_the_exact_sample`, `ble_clock_sync_removes_bluetooth_jitter` | a scheduled note starts on its exact sample inside an audio block; notes sent 10 ms apart but received with random radio delay are played exactly 10 ms apart |
 
 ## By hand: app checklist
 
@@ -60,3 +61,5 @@ Do this on the desktop build and on an Android phone.
 | 20 | ▴ More on the Sequencer tab, tap cells in the grid | The note on that step changes; the bottom row toggles accents |
 | 21 | Effects tab: Delay Mix up, Sync on, 1/8 . | Echoes on the beat of the sequencer tempo; changing Tempo changes the echo |
 | 22 | On Android: press Home while a note or the sequencer plays | Sound stops at once; back in the app, playing works again |
+| 23 | ⚙ Settings → Buffer: Auto, 5, 10, 20 ms while playing | The audio line shows the new buffer; 5 ms responds fastest, nothing crackles at 10 ms or Auto; the choice is kept after a restart |
+| 24 | Play fast notes from the PSoC 6 with "Steady Bluetooth timing" on, then off | On: the rhythm is even. Off: notes come slightly sooner but with uneven timing |

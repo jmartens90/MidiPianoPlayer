@@ -24,8 +24,20 @@ void BleMidiParser::reset() {
 
 std::vector<MidiMessage> BleMidiParser::parse(const std::uint8_t* data, std::size_t length) {
   std::vector<MidiMessage> messages;
+  for (const TimedMessage& timed : parseTimed(data, length)) messages.push_back(timed.message);
+  return messages;
+}
+
+std::vector<BleMidiParser::TimedMessage> BleMidiParser::parseTimed(const std::uint8_t* data, std::size_t length) {
+  std::vector<TimedMessage> messages;
   // Een geldig pakket heeft minstens een header en begint met 10xxxxxx.
   if (data == nullptr || length < 2 || (data[0] & 0xC0) != 0x80) return messages;
+
+  // Tijdstempel = 6 hoge bits uit de header + 7 lage bits uit elke tijdstempel-byte. Wordt de lage
+  // waarde kleiner dan de vorige in hetzelfde pakket, dan is ze rondgelopen: hoge bits + 1.
+  int high = data[0] & 0x3F;
+  int lastLow = -1;
+  int timestamp = high << 7;
 
   // Na de header (en na elk volledig bericht) is een byte met bit 7 = 1 een tijdstempel.
   bool expectTimestamp = true;
@@ -42,7 +54,11 @@ std::vector<MidiMessage> BleMidiParser::parse(const std::uint8_t* data, std::siz
     }
 
     if (byte & 0x80) {
-      if (expectTimestamp) {  // tijdstempel: we spelen alles meteen af, dus enkel overslaan
+      if (expectTimestamp) {  // tijdstempel van het volgende bericht
+        const int low = byte & 0x7F;
+        if (lastLow >= 0 && low < lastLow) high = (high + 1) & 0x3F;
+        lastLow = low;
+        timestamp = (high << 7) | low;
         expectTimestamp = false;
         continue;
       }
@@ -70,7 +86,7 @@ std::vector<MidiMessage> BleMidiParser::parse(const std::uint8_t* data, std::siz
     if (dataCount_ < dataLength(runningStatus_)) continue;
 
     if (runningStatus_ < 0xF0) {  // alleen kanaalberichten gaan naar de synth
-      messages.emplace_back(runningStatus_, data_[0], dataCount_ > 1 ? data_[1] : std::uint8_t{0});
+      messages.push_back({MidiMessage(runningStatus_, data_[0], dataCount_ > 1 ? data_[1] : std::uint8_t{0}), timestamp});
     } else {
       runningStatus_ = 0;  // system common: geen running status
     }

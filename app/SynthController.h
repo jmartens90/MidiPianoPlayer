@@ -8,6 +8,7 @@
 #include <QVariantList>
 #include <QtQml/qqmlregistration.h>
 
+#include <chrono>
 #include <memory>
 #include <vector>
 
@@ -41,7 +42,10 @@ class SynthController : public QObject {
   Q_PROPERTY(bool synthControlsEnabled READ synthControlsEnabled NOTIFY instrumentChanged)
   Q_PROPERTY(bool sustain READ sustain WRITE setSustain NOTIFY sustainChanged)
   Q_PROPERTY(BleMidiSource* bluetooth READ bluetooth CONSTANT)
-  Q_PROPERTY(QString audioInfo READ audioInfo CONSTANT)
+  Q_PROPERTY(QString audioInfo READ audioInfo NOTIFY audioChanged)
+  // Audiobuffer in ms (0 = automatisch) en of Bluetooth-noten op hun tijdstempel ingepland worden.
+  Q_PROPERTY(int bufferMs READ bufferMs WRITE setBufferMs NOTIFY audioChanged)
+  Q_PROPERTY(bool steadyTiming READ steadyTiming WRITE setSteadyTiming NOTIFY audioChanged)
   // Step sequencer: de stappen (lijst van {active, note, accent}), afspelen en de huidige stap.
   Q_PROPERTY(QVariantList steps READ steps NOTIFY stepsChanged)
   Q_PROPERTY(bool stepSequencerRunning READ stepSequencerRunning NOTIFY stepSequencerRunningChanged)
@@ -84,6 +88,10 @@ class SynthController : public QObject {
   bool stepSequencerRunning() const { return stepSequencer_->isRunning(); }
   int currentStep() const { return currentStep_; }
   void setSustain(bool down);
+  int bufferMs() const { return bufferMs_; }
+  void setBufferMs(int ms);
+  bool steadyTiming() const { return steadyTiming_; }
+  void setSteadyTiming(bool on);
 
   void copyScope(std::vector<float>& out) const { synth_.scopeSnapshot(out); }
 
@@ -100,6 +108,7 @@ class SynthController : public QObject {
   void currentStepChanged();
   void noteStateChanged(int note, bool on);  // noten van de sequencer, om toetsen te laten oplichten
   void scopeUpdated();
+  void audioChanged();
 
  private slots:
   void onTick();
@@ -107,6 +116,9 @@ class SynthController : public QObject {
 
  private:
   void onSourceMessage(const midi::MidiMessage& message);
+  void onTimedMessage(const midi::MidiMessage& message, dsp::Synth::Clock::time_point when);
+  void openAudio();
+  void updateTiming();
   void refreshPresets();
   void loadSoundFont();
   void setStatus(const QString& text);
@@ -129,6 +141,9 @@ class SynthController : public QObject {
   QStringList instrumentNames_;
   QString statusText_;
   int activeVoices_ = 0;
+  int bufferMs_ = 0;
+  bool steadyTiming_ = true;
+  std::chrono::milliseconds lookahead_{15};  // hoe ver vooruit noten ingepland worden
 };
 
 }  // namespace midipiano::app

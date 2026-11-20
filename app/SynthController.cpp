@@ -3,6 +3,7 @@
 #include <QFile>
 #include <QGuiApplication>
 #include <QMetaObject>
+#include <QSettings>
 #include <QStandardPaths>
 
 #include <algorithm>
@@ -25,11 +26,10 @@ SynthController::SynthController(QObject* parent)
       tick_(new QTimer(this)) {
   // new QTimer(this): de controller is de Qt-parent, dus Qt verwijdert de timer automatisch samen
   // met de controller ("kill children"), zonder delete.
-  try {
-    audio_ = std::make_unique<audio::AudioOutput>(synth_);
-  } catch (const audio::AudioError& e) {
-    setStatus(QStringLiteral("No sound: %1").arg(QString::fromUtf8(e.what())));
-  }
+  QSettings settings;
+  bufferMs_ = settings.value(QStringLiteral("audio/bufferMs"), 0).toInt();
+  steadyTiming_ = settings.value(QStringLiteral("audio/steadyTiming"), true).toBool();
+  openAudio();
 
   loadSoundFont();
 
@@ -55,6 +55,7 @@ SynthController::SynthController(QObject* parent)
 
   // Bluetooth-noten volgen dezelfde weg als die van de demo-sequencer (polymorfie via MidiSource).
   bluetooth_->start([this](const midi::MidiMessage& message) { onSourceMessage(message); });
+  updateTiming();
   tick_->start(33);
 }
 
@@ -76,6 +77,7 @@ void SynthController::toggleStepSequencer() {
     stepSequencer_->stop();
   } else {
     synth_.setTempo(stepSequencer_->bpm());
+    updateTiming();
     stepSequencer_->start([this](const midi::MidiMessage& message) { onSourceMessage(message); });
   }
   emit stepSequencerRunningChanged();
@@ -113,6 +115,55 @@ void SynthController::onApplicationStateChanged(Qt::ApplicationState state) {
   } else if (state == Qt::ApplicationActive) {
     if (audio_) audio_->resume();
   }
+}
+
+void SynthController::openAudio() {
+  audio_.reset();  // eerst de oude stream sluiten, dan pas een nieuwe openen
+  try {
+    audio_ = std::make_unique<audio::AudioOutput>(synth_, static_cast<unsigned>(bufferMs_));
+  } catch (const audio::AudioError& e) {
+    setStatus(QStringLiteral("No sound: %1").arg(QString::fromUtf8(e.what())));
+  }
+}
+
+void SynthController::updateTiming() {
+  // Noten worden een vaste tijd vooruit ingepland: een audioblok plus wat speling. Zo valt elke
+  // noot op zijn exacte sample, ongeacht wanneer het audioblok toevallig berekend wordt.
+  const double block = audio_ ? audio_->blockMilliseconds() : 10.0;
+  lookahead_ = std::chrono::milliseconds(static_cast<int>(block) + 5);
+  auto timed = [this](const midi::MidiMessage& message, dsp::Synth::Clock::time_point when) {
+    onTimedMessage(message, when);
+  };
+  if (!stepSequencer_->isRunning()) stepSequencer_->setTimedOutput(timed, lookahead_);
+  // Bluetooth: de tijdstempels van de PSoC houden de afstand tussen noten gelijk; de vaste
+  // vertraging (blok + 20 ms) vangt de wisselende radiovertraging op. Uit = meteen spelen.
+  if (steadyTiming_) {
+    const auto delay = std::chrono::milliseconds(static_cast<int>(block) + 20);
+    bluetooth_->setTimedOutput([this, delay](const midi::MidiMessage& message, dsp::Synth::Clock::time_point when) {
+      onTimedMessage(message, when + delay);
+    });
+  } else {
+    bluetooth_->setTimedOutput(nullptr);
+  }
+}
+
+void SynthController::setBufferMs(int ms) {
+  ms = (ms == 5 || ms == 10 || ms == 20) ? ms : 0;
+  if (ms == bufferMs_) return;
+  bufferMs_ = ms;
+  QSettings().setValue(QStringLiteral("audio/bufferMs"), ms);
+  synth_.allNotesOff();
+  openAudio();
+  updateTiming();
+  emit audioChanged();
+}
+
+void SynthController::setSteadyTiming(bool on) {
+  if (on == steadyTiming_) return;
+  steadyTiming_ = on;
+  QSettings().setValue(QStringLiteral("audio/steadyTiming"), on);
+  updateTiming();
+  emit audioChanged();
 }
 
 QString SynthController::audioInfo() const {
@@ -237,6 +288,16 @@ void SynthController::onSourceMessage(const midi::MidiMessage& message) {
   const int note = message.note();
   const bool on = message.isNoteOn();
   if (message.isNoteOn() || message.isNoteOff()) {
+    QMetaObject::invokeMethod(this, [this, note, on] { emit noteStateChanged(note, on); }, Qt::QueuedConnection);
+  }
+}
+
+void SynthController::onTimedMessage(const midi::MidiMessage& message, dsp::Synth::Clock::time_point when) {
+  // De synth zet de noot op het exacte sample van "when" (zie Synth::schedule).
+  synth_.schedule(message, when);
+  if (message.isNoteOn() || message.isNoteOff()) {
+    const int note = message.note();
+    const bool on = message.isNoteOn();
     QMetaObject::invokeMethod(this, [this, note, on] { emit noteStateChanged(note, on); }, Qt::QueuedConnection);
   }
 }
