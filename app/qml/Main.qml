@@ -118,24 +118,34 @@ ApplicationWindow {
                 focusPolicy: Qt.NoFocus
                 onToggled: synth.sustain = checked
             }
-            Label {
-                Layout.fillWidth: true
-                text: synth.statusText
-                elide: Text.ElideRight
-                color: "#f0b35a"
-            }
-            Label {
-                text: synth.activeVoices
-                opacity: 0.6
-                Layout.preferredWidth: 22
-                horizontalAlignment: Text.AlignRight
-            }
+            Item { Layout.fillWidth: true }
             ToolButton {
-                // Instellingen: Bluetooth MIDI en audio-info. Het blauwe bolletje = Bluetooth verbonden.
-                text: "\u2699"
-                font.pixelSize: 22
+                // Instellingen: Bluetooth MIDI en audio. Zelf getekend (drie schuifregelaars), want het
+                // tandwiel-teken wordt op Android als kleurige emoji getoond. Blauw bolletje = Bluetooth verbonden.
+                id: settingsButton
                 focusPolicy: Qt.NoFocus
+                Layout.preferredWidth: 44
                 onClicked: settingsDrawer.open()
+                Column {
+                    anchors.centerIn: parent
+                    spacing: 5
+                    Repeater {
+                        model: [0.3, 0.7, 0.45]
+                        Item {
+                            required property real modelData
+                            width: 22; height: 2
+                            Rectangle { anchors.fill: parent; radius: 1; color: "#d8dae3" }
+                            Rectangle {
+                                width: 7; height: 7; radius: 3.5
+                                x: parent.modelData * (parent.width - width)
+                                anchors.verticalCenter: parent.verticalCenter
+                                color: "#20222b"
+                                border.color: "#d8dae3"
+                                border.width: 2
+                            }
+                        }
+                    }
+                }
                 Rectangle {
                     visible: synth.bluetooth.connected
                     width: 8; height: 8; radius: 4
@@ -230,6 +240,7 @@ ApplicationWindow {
 
                 Label { text: qsTr("Audio"); font.bold: true; font.pixelSize: 15; Layout.topMargin: 10 }
                 Label { text: synth.audioInfo; opacity: 0.75 }
+                Label { text: qsTr("Voices playing: %1 of 8 (synth)").arg(synth.activeVoices); opacity: 0.75 }
                 RowLayout {
                     Layout.fillWidth: true
                     Label { text: qsTr("Buffer"); Layout.fillWidth: true }
@@ -318,8 +329,25 @@ ApplicationWindow {
                 font.pixelSize: 11
             }
             ToolButton {
-                text: window.expanded ? qsTr("▾ Less") : qsTr("▴ More")
+                // Pijltje zelf getekend: het driehoek-teken ontbreekt in het lettertype van sommige gsm's.
+                text: window.expanded ? qsTr("Less") : qsTr("More")
+                leftPadding: 26
                 focusPolicy: Qt.NoFocus
+                Canvas {
+                    width: 10; height: 6
+                    x: 10
+                    anchors.verticalCenter: parent.verticalCenter
+                    rotation: window.expanded ? 180 : 0
+                    onPaint: {
+                        const ctx = getContext("2d")
+                        ctx.reset()
+                        ctx.strokeStyle = "#d8dae3"
+                        ctx.lineWidth = 2
+                        ctx.beginPath()
+                        ctx.moveTo(1, 5); ctx.lineTo(5, 1); ctx.lineTo(9, 5)
+                        ctx.stroke()
+                    }
+                }
                 implicitHeight: window.compact ? 30 : 36
                 font.pixelSize: window.compact ? 11 : 13
                 onClicked: window.expanded = !window.expanded
@@ -470,6 +498,28 @@ ApplicationWindow {
             firstNote: 48 + window.octaveShift * 12
             whiteKeyCount: Math.max(8, Math.min(29, Math.floor(width / 44)))
             onNotePressed: (note, velocity) => synth.noteOn(note, velocity)
+
+            // Meldingen (preset geladen, Bluetooth-fouten, ...) verschijnen even bovenaan het
+            // toetsenbord en verdwijnen na 3 seconden, zodat ze de bovenbalk niet overlappen.
+            Rectangle {
+                id: toast
+                z: 10
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.top: parent.top
+                anchors.topMargin: 8
+                width: toastLabel.implicitWidth + 28
+                height: toastLabel.implicitHeight + 14
+                radius: height / 2
+                color: "#e62b2d36"
+                opacity: 0
+                Behavior on opacity { NumberAnimation { duration: 200 } }
+                Label { id: toastLabel; anchors.centerIn: parent; color: "#f0b35a"; text: synth.statusText }
+                Timer { id: toastTimer; interval: 3000; onTriggered: toast.opacity = 0 }
+                Connections {
+                    target: synth
+                    function onStatusTextChanged() { toast.opacity = 1; toastTimer.restart() }
+                }
+            }
             onNoteReleased: (note) => synth.noteOff(note)
             onPedalChanged: (down) => synth.sustain = down
         }

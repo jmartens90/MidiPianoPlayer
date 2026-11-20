@@ -105,7 +105,9 @@ void StepSequencer::run(Callback onMessage) {
     const auto noteEnd = noteStart + std::chrono::duration_cast<Clock::duration>(
                                          std::chrono::duration<float>(stepSeconds * gate_ * 0.95f));
     const bool keepGoing = waitUntil(noteEnd - lookahead_);
-    if (current.active) send(MidiMessage::noteOff(0, static_cast<std::uint8_t>(note)), noteEnd);
+    // Bij stoppen (ook bij herstarten door een nieuwe toets) gaat de noot meteen uit, niet pas op
+    // zijn geplande einde: anders zou die uitgestelde Note Off de nieuwe noot kunnen afkappen.
+    if (current.active) send(MidiMessage::noteOff(0, static_cast<std::uint8_t>(note)), keepGoing ? noteEnd : Clock::now());
     if (!keepGoing) break;
 
     stepStart += std::chrono::duration_cast<Clock::duration>(std::chrono::duration<float>(stepSeconds));

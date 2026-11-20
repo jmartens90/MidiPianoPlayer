@@ -15,6 +15,7 @@
 namespace midipiano::app {
 
 namespace {
+constexpr int kFollowRoot = 36;  // C2: in key-follow-modus speelt deze toets het patroon ongewijzigd
 std::uint8_t toMidiByte(int value) { return static_cast<std::uint8_t>(std::clamp(value, 0, 127)); }
 }  // namespace
 
@@ -54,7 +55,7 @@ SynthController::SynthController(QObject* parent)
   connect(qGuiApp, &QGuiApplication::applicationStateChanged, this, &SynthController::onApplicationStateChanged);
 
   // Bluetooth-noten volgen dezelfde weg als die van de demo-sequencer (polymorfie via MidiSource).
-  bluetooth_->start([this](const midi::MidiMessage& message) { onSourceMessage(message); });
+  bluetooth_->start([this](const midi::MidiMessage& message) { onLiveMessage(message); });
   updateTiming();
   tick_->start(33);
 }
@@ -76,11 +77,61 @@ void SynthController::toggleStepSequencer() {
   if (stepSequencer_->isRunning()) {
     stepSequencer_->stop();
   } else {
-    synth_.setTempo(stepSequencer_->bpm());
-    updateTiming();
-    stepSequencer_->start([this](const midi::MidiMessage& message) { onSourceMessage(message); });
+    heldKeys_.clear();
+    stepSequencer_->setTranspose(0);
+    startStepSequencer();
   }
   emit stepSequencerRunningChanged();
+}
+
+void SynthController::startStepSequencer() {
+  synth_.setTempo(stepSequencer_->bpm());
+  updateTiming();
+  stepSequencer_->start([this](const midi::MidiMessage& message) { onSourceMessage(message); });
+}
+
+// Key follow: zoals een arpeggiator of de "key trigger" van een groovebox. Elke nieuwe toets (gate)
+// start het patroon opnieuw vanaf stap 1, getransponeerd: C2 speelt het zoals het is, D2 een toon
+// hoger. Loslaten van de laatste toets stopt het; bij nog ingedrukte toetsen volgt het die zonder
+// herstart.
+void SynthController::setKeyFollow(bool on) {
+  if (on == keyFollow_) return;
+  keyFollow_ = on;
+  heldKeys_.clear();
+  if (stepSequencer_->isRunning()) {
+    stepSequencer_->stop();
+    emit stepSequencerRunningChanged();
+  }
+  stepSequencer_->setTranspose(0);
+  emit keyFollowChanged();
+}
+
+void SynthController::followNoteOn(int note) {
+  heldKeys_.erase(std::remove(heldKeys_.begin(), heldKeys_.end(), note), heldKeys_.end());
+  heldKeys_.push_back(note);
+  stepSequencer_->stop();
+  stepSequencer_->setTranspose(note - kFollowRoot);
+  startStepSequencer();
+  emit stepSequencerRunningChanged();
+}
+
+void SynthController::followNoteOff(int note) {
+  const auto it = std::find(heldKeys_.begin(), heldKeys_.end(), note);
+  if (it == heldKeys_.end()) return;
+  heldKeys_.erase(it);
+  if (heldKeys_.empty()) {
+    stepSequencer_->stop();
+    emit stepSequencerRunningChanged();
+  } else {
+    stepSequencer_->setTranspose(heldKeys_.back() - kFollowRoot);
+  }
+}
+
+void SynthController::onLiveMessage(const midi::MidiMessage& message) {
+  // Noten van Bluetooth: in key-follow-modus sturen ze de sequencer, anders spelen ze gewoon.
+  if (keyFollow_ && message.isNoteOn()) return followNoteOn(message.note());
+  if (keyFollow_ && message.isNoteOff()) return followNoteOff(message.note());
+  onSourceMessage(message);
 }
 
 void SynthController::setStep(int index, bool active, int note, bool accent) {
@@ -109,6 +160,7 @@ void SynthController::onApplicationStateChanged(Qt::ApplicationState state) {
       source_->stop();
       emit sequencerRunningChanged();
     }
+    heldKeys_.clear();
     setSustain(false);
     synth_.allNotesOff();
     if (audio_) audio_->pause();
@@ -140,6 +192,7 @@ void SynthController::updateTiming() {
   if (steadyTiming_) {
     const auto delay = std::chrono::milliseconds(static_cast<int>(block) + 20);
     bluetooth_->setTimedOutput([this, delay](const midi::MidiMessage& message, dsp::Synth::Clock::time_point when) {
+      if (keyFollow_ && (message.isNoteOn() || message.isNoteOff())) return onLiveMessage(message);
       onTimedMessage(message, when + delay);
     });
   } else {
@@ -197,9 +250,15 @@ void SynthController::setInstrument(int index) {
   emit instrumentChanged();
 }
 
-void SynthController::noteOn(int note, int velocity) { synth_.noteOn(toMidiByte(note), toMidiByte(velocity)); }
+void SynthController::noteOn(int note, int velocity) {
+  if (keyFollow_) return followNoteOn(std::clamp(note, 0, 127));
+  synth_.noteOn(toMidiByte(note), toMidiByte(velocity));
+}
 
-void SynthController::noteOff(int note) { synth_.noteOff(toMidiByte(note)); }
+void SynthController::noteOff(int note) {
+  if (keyFollow_) return followNoteOff(std::clamp(note, 0, 127));
+  synth_.noteOff(toMidiByte(note));
+}
 
 void SynthController::allNotesOff() { synth_.allNotesOff(); }
 

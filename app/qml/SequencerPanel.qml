@@ -27,12 +27,32 @@ Item {
             Layout.fillWidth: true
             Layout.fillHeight: !panel.expanded
 
-            Button {
-                text: panel.engine.stepSequencerRunning ? qsTr("Stop") : qsTr("Play")
-                highlighted: panel.engine.stepSequencerRunning
-                focusPolicy: Qt.NoFocus
-                Layout.preferredWidth: panel.compact ? 64 : 80
-                onClicked: panel.engine.toggleStepSequencer()
+            ColumnLayout {
+                spacing: 0
+                Layout.alignment: Qt.AlignVCenter
+                Button {
+                    text: panel.engine.stepSequencerRunning ? qsTr("Stop") : qsTr("Play")
+                    highlighted: panel.engine.stepSequencerRunning
+                    focusPolicy: Qt.NoFocus
+                    Layout.preferredWidth: 84
+                    implicitHeight: panel.compact ? 34 : 42
+                    topInset: 0; bottomInset: 0
+                    onClicked: panel.engine.toggleStepSequencer()
+                }
+                Button {
+                    // Key follow: een toets speelt het patroon vanaf stap 1, C2 = zoals het is, D2 = een toon hoger.
+                    text: qsTr("Key")
+                    checkable: true
+                    checked: panel.engine.keyFollow
+                    highlighted: checked
+                    flat: !checked
+                    focusPolicy: Qt.NoFocus
+                    Layout.preferredWidth: 84
+                    implicitHeight: panel.compact ? 30 : 38
+                    topInset: 0; bottomInset: 0
+                    font.pixelSize: 12
+                    onToggled: panel.engine.keyFollow = checked
+                }
             }
             KnobStrip {
                 engine: panel.engine

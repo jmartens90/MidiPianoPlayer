@@ -24,7 +24,7 @@ plays the same kind of pattern.
 * A demo sequencer running on its own thread. Its notes light up on the keyboard.
 * Low-latency audio through [miniaudio](https://miniaud.io): WASAPI, Core Audio, PulseAudio/ALSA or AAudio.
 * Bluetooth LE MIDI input: search and connect from the settings panel, then play from the PSoC 6 or any BLE MIDI device.
-* Three panels, Synth, Effects and Sequencer, that you switch with tabs. **▴ More** makes the panel
+* Three panels, Synth, Effects and Sequencer, that you switch with tabs. **More** makes the panel
   big (the keyboard gets smaller), like the hidden advanced section of an Arturia synth.
 * A 16-step sequencer: tempo, gate, swing, accents, and a note grid in the big view. It plays on its
   own thread with drift-free timing.
@@ -98,7 +98,7 @@ Only the app is built for Android. The unit tests run on the PC.
 The app can be played from any Bluetooth LE MIDI device: the PSoC 6 sequencer of this project, a BLE
 MIDI keyboard, or a phone/PC app that sends BLE MIDI.
 
-1. Open **⚙ Settings** and tap **Search devices**. On Android the first time asks for Bluetooth
+1. Open **Settings** (the slider icon top right) and tap **Search devices**. On Android the first time asks for Bluetooth
    permission.
 2. Devices that advertise MIDI are at the top, marked **• MIDI**. Tap one to connect.
 3. Play on the device. Its notes play on the current instrument and light up on the keyboard;
@@ -137,14 +137,14 @@ From a key press on the PSoC 6 to sound is roughly 20 to 35 ms. To keep the rhyt
 | Reso | (Synth only) Filter resonance: a whistling peak at the cutoff; at the top the filter sings by itself |
 | Drive | (Synth only) Pushes the filter into saturation for a dirtier sound |
 | Env→Filt | (Synth only) How far the envelope opens the filter on every note (the "acid" squelch) |
-| Synth / Effects / Sequencer | Tabs above the knobs. **▴ More** / **▾ Less** makes the panel big or small |
+| Synth / Effects / Sequencer | Tabs above the knobs. **More** / **Less** makes the panel big or small |
 | Delay (Effects) | Mix, Feedback, Tone, and Time, or with **Sync** on a note value that follows the sequencer tempo |
 | Reverb (Effects) | Mix, Predelay, Decay, Damping, Low cut (pre-filter on the reverb input) and High cut (post-filter on the reverb output) |
-| Sequencer | Play/Stop, Tempo, Gate, Swing. Tap a step to switch it on or off. In the big view, tap a cell to put that note on that step, and use the bottom row for accents; Octave −/+ moves the grid, Clear and Reset change the whole pattern |
+| Sequencer | Play/Stop, Tempo, Gate, Swing. Tap a step to switch it on or off. In the big view, tap a cell to put that note on that step, and use the bottom row for accents; Octave −/+ moves the grid, Clear and Reset change the whole pattern. **Key**: each key you press (on screen or over Bluetooth) restarts the pattern from step 1, transposed: C2 plays it as written, D2 a tone higher; releasing the key stops it |
 | Volume | Master volume |
 | Pedal | Sustain pedal: released notes keep ringing until you turn it off. On a PC you can also hold the space bar |
 | Octave − / + | Shift the keyboard from C0 to C6 |
-| ⚙ (Settings) | Bluetooth MIDI (search, connect, disconnect), audio buffer size, steady Bluetooth timing, audio info and keyboard help. A blue dot means a Bluetooth device is connected |
+| Settings (slider icon) | Bluetooth MIDI (search, connect, disconnect), audio buffer size, steady Bluetooth timing, audio info and keyboard help. A blue dot means a Bluetooth device is connected |
 | Preset list / Save | (Synth only) Load a preset, or save the current synth sound under a name |
 | Play demo | Starts the demo sequencer (an Am - F - C - G arpeggio) |
 

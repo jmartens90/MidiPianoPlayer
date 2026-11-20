@@ -53,7 +53,7 @@ Do this on the desktop build and on an Android phone.
 | 12 | Close and reopen the app | "Test" is still in the preset list |
 | 13 | Put "cutoff=abc" in Test.preset with a text editor, then load it | Orange error message with the line number, the app keeps running |
 | 14 | Run without a sound card (or with it disabled) | Status shows "No sound: ...", the app keeps running |
-| 15 | ⚙ Settings → Search devices, with a BLE MIDI device (PSoC 6) switched on | The device appears at the top, marked "• MIDI" |
+| 15 | Settings → Search devices, with a BLE MIDI device (PSoC 6) switched on | The device appears at the top, marked "• MIDI" |
 | 16 | Tap the device, then play notes on it | Status shows "Connected to ...", notes sound and light up, the message counter rises |
 | 17 | Switch the device off while connected | Status shows "... disconnected", no notes keep hanging |
 | 18 | Search on a PC without Bluetooth | Orange "Bluetooth error: ..." message, the app keeps running |
@@ -61,5 +61,7 @@ Do this on the desktop build and on an Android phone.
 | 20 | ▴ More on the Sequencer tab, tap cells in the grid | The note on that step changes; the bottom row toggles accents |
 | 21 | Effects tab: Delay Mix up, Sync on, 1/8 . | Echoes on the beat of the sequencer tempo; changing Tempo changes the echo |
 | 22 | On Android: press Home while a note or the sequencer plays | Sound stops at once; back in the app, playing works again |
-| 23 | ⚙ Settings → Buffer: Auto, 5, 10, 20 ms while playing | The audio line shows the new buffer; 5 ms responds fastest, nothing crackles at 10 ms or Auto; the choice is kept after a restart |
+| 23 | Settings → Buffer: Auto, 5, 10, 20 ms while playing | The audio line shows the new buffer; 5 ms responds fastest, nothing crackles at 10 ms or Auto; the choice is kept after a restart |
 | 24 | Play fast notes from the PSoC 6 with "Steady Bluetooth timing" on, then off | On: the rhythm is even. Off: notes come slightly sooner but with uneven timing |
+| 25 | Sequencer tab → Key on, hold C2, then D2, then let go | C2 plays the pattern from step 1, D2 restarts it a tone higher, letting go stops it |
+| 26 | Load a preset on a phone | "Loaded ..." appears above the keyboard for 3 seconds and does not cover the header |

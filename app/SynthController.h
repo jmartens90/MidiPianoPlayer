@@ -50,6 +50,8 @@ class SynthController : public QObject {
   Q_PROPERTY(QVariantList steps READ steps NOTIFY stepsChanged)
   Q_PROPERTY(bool stepSequencerRunning READ stepSequencerRunning NOTIFY stepSequencerRunningChanged)
   Q_PROPERTY(int currentStep READ currentStep NOTIFY currentStepChanged)
+  // Key follow: een toets start het patroon, getransponeerd ten opzichte van C2.
+  Q_PROPERTY(bool keyFollow READ keyFollow WRITE setKeyFollow NOTIFY keyFollowChanged)
 
  public:
   explicit SynthController(QObject* parent = nullptr);
@@ -88,6 +90,8 @@ class SynthController : public QObject {
   bool stepSequencerRunning() const { return stepSequencer_->isRunning(); }
   int currentStep() const { return currentStep_; }
   void setSustain(bool down);
+  bool keyFollow() const { return keyFollow_; }
+  void setKeyFollow(bool on);
   int bufferMs() const { return bufferMs_; }
   void setBufferMs(int ms);
   bool steadyTiming() const { return steadyTiming_; }
@@ -109,6 +113,7 @@ class SynthController : public QObject {
   void noteStateChanged(int note, bool on);  // noten van de sequencer, om toetsen te laten oplichten
   void scopeUpdated();
   void audioChanged();
+  void keyFollowChanged();
 
  private slots:
   void onTick();
@@ -118,6 +123,10 @@ class SynthController : public QObject {
   void onSourceMessage(const midi::MidiMessage& message);
   void onTimedMessage(const midi::MidiMessage& message, dsp::Synth::Clock::time_point when);
   void openAudio();
+  void onLiveMessage(const midi::MidiMessage& message);
+  void followNoteOn(int note);
+  void followNoteOff(int note);
+  void startStepSequencer();
   void updateTiming();
   void refreshPresets();
   void loadSoundFont();
@@ -143,6 +152,8 @@ class SynthController : public QObject {
   int activeVoices_ = 0;
   int bufferMs_ = 0;
   bool steadyTiming_ = true;
+  bool keyFollow_ = false;
+  std::vector<int> heldKeys_;  // ingedrukte toetsen in key-follow-modus, de laatste bepaalt de toonhoogte
   std::chrono::milliseconds lookahead_{15};  // hoe ver vooruit noten ingepland worden
 };
 
