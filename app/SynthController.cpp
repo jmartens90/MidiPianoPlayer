@@ -7,8 +7,10 @@
 #include <QStandardPaths>
 
 #include <algorithm>
+#include <cmath>
 #include <exception>
 
+#include "midipiano/dsp/Modulation.h"
 #include "midipiano/dsp/SoundFont.h"
 #include "midipiano/midi/DemoSequencer.h"
 
@@ -324,6 +326,33 @@ void SynthController::setWaveform(int waveform) {
   patch.setWaveform(static_cast<dsp::Waveform>(waveform));
   synth_.applyPatch(patch);
   emit patchChanged();
+}
+
+QStringList SynthController::modTargetNames() const {
+  QStringList names;
+  for (const std::string& name : dsp::modTargetNames()) names << QString::fromStdString(name);
+  return names;
+}
+
+QStringList SynthController::lfoShapeNames() const {
+  QStringList names;
+  for (const std::string& name : dsp::Lfo::shapeNames()) names << QString::fromStdString(name);
+  return names;
+}
+
+QStringList SynthController::modulatedParams() const {
+  // Knopnaam per ModTarget (Pitch heeft geen knop). Een knop is gemoduleerd als een bron met een
+  // diepte verschillend van 0 erop gericht staat.
+  static const char* const kParamOf[] = {"", "", "cutoff", "resonance", "position", "drive", "volume"};
+  const preset::Patch& patch = synth_.patch();
+  QStringList result;
+  for (const char* source : {"lfo1", "lfo2", "env2"}) {
+    const std::string prefix(source);
+    const int target = static_cast<int>(std::lround(patch.get(prefix + "_target")));
+    if (target <= 0 || target >= static_cast<int>(dsp::kModTargets) || patch.get(prefix + "_amount") == 0.0f) continue;
+    result << QString::fromLatin1(kParamOf[target]);
+  }
+  return result;
 }
 
 QStringList SynthController::waveformNames() const {

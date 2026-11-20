@@ -6,6 +6,7 @@
 
 #include "midipiano/dsp/Envelope.h"
 #include "midipiano/dsp/LowPassFilter.h"
+#include "midipiano/dsp/Modulation.h"
 #include "midipiano/dsp/Oscillator.h"
 #include "midipiano/dsp/Waveforms.h"
 
@@ -20,10 +21,16 @@ class Voice {
   void start(std::uint8_t note, std::uint8_t velocity, std::uint64_t startedAt);
   void release();
   float render(float sampleRate);
+  // Om de 16 samples (control rate): LFO-waarden + de eigen modulatie-envelope toepassen op toonhoogte,
+  // filter, positie en volume. envTarget/envAmount: waar de modulatie-envelope aan draait.
+  void control(const ModValues& lfo, ModTarget envTarget, float envAmount, float sampleRate);
 
   void setWaveform(Waveform waveform);
   Envelope& envelope() { return envelope_; }
   LowPassFilter& filter() { return filter_; }
+  Envelope& modEnvelope() { return modEnvelope_; }
+  void setResonance(float amount) { baseResonance_ = amount; filter_.setResonance(amount); }
+  void setDrive(float drive) { baseDrive_ = drive; filter_.setDrive(drive); }
   void setFilterEnvAmount(float amount) { filterEnvAmount_ = amount; }
   void setWavetablePosition(float position);
 
@@ -45,6 +52,7 @@ class Voice {
   std::unique_ptr<Oscillator> oscillator_;
   LowPassFilter filter_;
   Envelope envelope_;
+  Envelope modEnvelope_{0.01f, 0.5f, 0.0f, 0.3f};  // tweede envelope, alleen voor modulatie
 
   // Vereiste 31: 31.useful member variabel
   // note_ onthoudt welke toets deze Voice speelt, zodat Synth::noteOff() bij het loslaten van C4
@@ -52,7 +60,10 @@ class Voice {
   std::uint8_t note_ = 0;
   float filterEnvAmount_ = 0.0f;
   float wavetablePosition_ = 0.0f;
-  std::uint32_t controlCounter_ = 0;
+  float baseResonance_ = 0.0f;
+  float baseDrive_ = 1.0f;
+  float pitchFactor_ = 1.0f;  // door modulatie (vibrato)
+  float ampFactor_ = 1.0f;    // door modulatie (tremolo)
   Waveform waveform_;
   float gain_ = 0.0f;
   float frequencyHz_ = 0.0f;

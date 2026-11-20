@@ -1,6 +1,8 @@
 #include "midipiano/dsp/VoiceSynth.h"
 
 #include <algorithm>
+#include <cmath>
+#include <string>
 
 namespace midipiano::dsp {
 
@@ -18,6 +20,10 @@ void VoiceSynth::noteOn(std::uint8_t note, std::uint8_t velocity) {
   Voice* voice = findFreeVoice();
   if (voice == nullptr) voice = &oldestVoice();
   voice->start(note, velocity, ++clock_);
+  for (LfoSlot& slot : lfos_) {
+    if (slot.retrigger) slot.lfo.reset();
+  }
+  controlCounter_ = 0;  // meteen een control-stap, zodat de nieuwe noot de juiste filter/toonhoogte heeft
 }
 
 void VoiceSynth::noteOff(std::uint8_t note) {
@@ -32,6 +38,15 @@ void VoiceSynth::allNotesOff() {
 
 void VoiceSynth::render(float* out, std::size_t frames) {
   for (std::size_t i = 0; i < frames; ++i) {
+    if ((controlCounter_++ & 15u) == 0) {
+      ModValues lfoValues{};
+      for (LfoSlot& slot : lfos_) {
+        const float value = slot.lfo.advance(16.0f / sampleRate_);
+        lfoValues[static_cast<std::size_t>(slot.target)] += value * slot.amount;
+      }
+      lfoValues[0] = 0.0f;  // "Off"
+      for (Voice& voice : voices_) voice.control(lfoValues, envTarget_, envAmount_, sampleRate_);
+    }
     float mix = 0.0f;
     for (Voice& voice : voices_) mix += voice.render(sampleRate_);
     out[i] = mix * 0.6f;
@@ -52,10 +67,30 @@ void VoiceSynth::applyPatch(const preset::Patch& patch) {
     voice.envelope().setSustain(patch.get("sustain"));
     voice.envelope().setRelease(patch.get("release"));
     voice.filter().setCutoff(patch.get("cutoff"));
-    voice.filter().setResonance(patch.get("resonance"));
-    voice.filter().setDrive(patch.get("drive"));
+    voice.setResonance(patch.get("resonance"));
+    voice.setDrive(patch.get("drive"));
     voice.setFilterEnvAmount(patch.get("envmod"));
+    voice.modEnvelope().setAttack(patch.get("env2_attack"));
+    voice.modEnvelope().setDecay(patch.get("env2_decay"));
+    voice.modEnvelope().setSustain(patch.get("env2_sustain"));
+    voice.modEnvelope().setRelease(patch.get("env2_release"));
   }
+  auto target = [&patch](const std::string& name) {
+    const int index = static_cast<int>(std::lround(patch.get(name)));
+    return static_cast<ModTarget>(std::clamp(index, 0, static_cast<int>(kModTargets) - 1));
+  };
+  for (std::size_t i = 0; i < lfos_.size(); ++i) {
+    const std::string prefix = "lfo" + std::to_string(i + 1) + "_";
+    LfoSlot& slot = lfos_[i];
+    slot.lfo.setRate(patch.get(prefix + "rate"));
+    const int shape = static_cast<int>(std::lround(patch.get(prefix + "shape")));
+    slot.lfo.setShape(static_cast<Lfo::Shape>(std::clamp(shape, 0, static_cast<int>(Lfo::Shape::Count) - 1)));
+    slot.target = target(prefix + "target");
+    slot.amount = modDepth(patch.get(prefix + "amount"));
+    slot.retrigger = patch.get(prefix + "retrig") >= 0.5f;
+  }
+  envTarget_ = target("env2_target");
+  envAmount_ = modDepth(patch.get("env2_amount"));
 }
 
 // Vereiste 46: 46.useful usage of nullptr

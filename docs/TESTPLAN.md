@@ -30,6 +30,7 @@ them on every push.
 | Delay | `delay_repeats_the_sound_at_the_right_time`, `delay_syncs_to_the_sequencer_tempo` | echoes arrive at the set time and get softer; sync uses the tempo |
 | Step sequencer | `step_sequencer_plays_active_steps_in_time` | only active steps play, accent = velocity 127, transpose works, stop is immediate |
 | Hanging notes | `restruck_piano_note_never_hangs`, `switching_instrument_releases_held_notes` | a key struck twice (pedal, sequencer) never keeps sounding |
+| Modulation | `lfo_shapes_stay_in_range`, `lfo_on_volume_makes_a_tremolo`, `mod_envelope_bends_the_pitch` | every LFO shape moves within -1..1; an LFO on Volume makes loud and quiet alternate; the mod envelope starts a note an octave higher and falls back |
 | Bluetooth | `ble_parser_*` (5 tests) | BLE MIDI packets: several messages, running status (also across packets), realtime and SysEx skipped, bad packets ignored, 13-bit timestamps and their wraparound |
 | Timing | `scheduled_note_starts_on_the_exact_sample`, `ble_clock_sync_removes_bluetooth_jitter` | a scheduled note starts on its exact sample inside an audio block; notes sent 10 ms apart but received with random radio delay are played exactly 10 ms apart |
 
@@ -67,3 +68,4 @@ Do this on the desktop build and on an Android phone.
 | 26 | Load a preset on a phone | "Loaded ..." appears above the keyboard for 3 seconds and does not cover the header |
 | 27 | On Android: open the app, let the phone go to sleep, wake it and unlock | Playing works right away, no restart needed |
 | 28 | Effects tab: Reverb Mix up, play a chord with headphones, turn Width from 1 to 0 and Size from 0 to 1 | Wide: the tail fills both ears; Width 0: it sits in the middle. Size 0 sounds like a small room, 1 like a hall |
+| 29 | Synth, Mod tab: LFO 1 → Cutoff, Rate 4 Hz, Amount up; then Mod env → Pitch | The filter wobbles and Cutoff on the Synth tab gets an orange dot; with the mod env every note starts higher and slides down. Preset "Wobble" does both LFOs |

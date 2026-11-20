@@ -6,6 +6,7 @@
 #include <cstdint>
 
 #include "midipiano/dsp/Instrument.h"
+#include "midipiano/dsp/Modulation.h"
 #include "midipiano/dsp/Voice.h"
 
 namespace midipiano::dsp {
@@ -38,6 +39,17 @@ class VoiceSynth final : public Instrument {
   // std::vector<std::unique_ptr<Instrument>> in Synth.
   std::array<Voice, kMaxVoices> voices_;
   float sampleRate_;
+  // Modulatie: twee LFO's voor alle stemmen samen, plus per stem een modulatie-envelope (in Voice).
+  struct LfoSlot {
+    Lfo lfo;
+    ModTarget target = ModTarget::None;
+    float amount = 0.0f;
+    bool retrigger = false;  // elke nieuwe noot start de LFO opnieuw
+  };
+  std::array<LfoSlot, 2> lfos_;
+  ModTarget envTarget_ = ModTarget::None;
+  float envAmount_ = 0.0f;
+  std::uint32_t controlCounter_ = 0;
   std::uint64_t clock_ = 0;
 };
 

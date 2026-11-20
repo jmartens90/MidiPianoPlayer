@@ -20,7 +20,8 @@ plays the same kind of pattern.
 * A multitouch keyboard: slide over the keys (glissando), and touch lower on a key to play louder.
   On a PC you can also play with the mouse or the computer keyboard (`A W S E D F T G Y H U J K`).
 * A live oscilloscope drawn with OpenGL.
-* Presets saved as text files, with five factory presets (Soft Pad, Square Lead, Pluck, Sine Organ, Nasty Acid).
+* Presets saved as text files, with six factory presets (Soft Pad, Square Lead, Pluck, Sine Organ, Nasty Acid, Wobble).
+* Modulation: two LFOs (sine, triangle, saw, square, random) and a modulation envelope, each aimed at pitch, cutoff, resonance, position, drive or volume. Modulated knobs get an orange dot.
 * A demo sequencer running on its own thread. Its notes light up on the keyboard.
 * Low-latency audio through [miniaudio](https://miniaud.io): WASAPI, Core Audio, PulseAudio/ALSA or AAudio.
 * Bluetooth LE MIDI input: search and connect from the settings panel, then play from the PSoC 6 or any BLE MIDI device.
@@ -137,7 +138,9 @@ From a key press on the PSoC 6 to sound is roughly 20 to 35 ms. To keep the rhyt
 | Reso | (Synth only) Filter resonance: a whistling peak at the cutoff; at the top the filter sings by itself |
 | Drive | (Synth only) Pushes the filter into saturation for a dirtier sound |
 | Env→Filt | (Synth only) How far the envelope opens the filter on every note (the "acid" squelch) |
-| Synth / Effects / Sequencer | Tabs above the knobs. **More** / **Less** makes the panel big or small |
+| Synth / Mod / Effects / Sequencer | Tabs above the knobs. **More** / **Less** makes the panel big or small |
+| LFO 1 / LFO 2 (Mod) | Target (which knob it moves, Off = not used), shape, Rate (0.05 to 20 Hz), Amount (negative = upside down) and Retrig (every new note restarts the LFO) |
+| Mod env (Mod) | A second envelope per note with its own target, Attack, Decay, Sustain, Release and Amount; for example a pitch drop on every note or a filter sweep |
 | Delay (Effects) | Mix, Feedback, Tone, and Time, or with **Sync** on a note value that follows the sequencer tempo |
 | Reverb (Effects) | Mix, Size (room to hall), Decay, Predelay, Damping, Low cut (pre-filter on the reverb input) and High cut (post-filter on the reverb output), Width (mono to wide stereo) |
 | Sequencer | Play/Stop, Tempo, Gate, Swing. Tap a step to switch it on or off. In the big view, tap a cell to put that note on that step, and use the bottom row for accents; Octave −/+ moves the grid, Clear and Reset change the whole pattern. **Key**: each key you press (on screen or over Bluetooth) restarts the pattern from step 1, transposed: C2 plays it as written, D2 a tone higher; releasing the key stops it |
@@ -217,8 +220,14 @@ classDiagram
     }
     class VoiceSynth {
         -array~Voice, 8~ voices_
+        -array~LfoSlot, 2~ lfos_
         +noteOn(note, velocity)
         -findFreeVoice() Voice*
+    }
+    class Lfo {
+        -float phase_
+        -Shape shape_
+        +advance(seconds) float
     }
     class SoundFont {
         -tsf* font_
@@ -399,6 +408,7 @@ classDiagram
     Instrument <|-- VoiceSynth
     Instrument <|-- SoundFontInstrument
     VoiceSynth *-- "8" Voice
+    VoiceSynth *-- "2" Lfo
     SoundFontInstrument o-- SoundFont : shared
     Synth *-- Patch
     Synth *-- RingBuffer
@@ -409,7 +419,7 @@ classDiagram
     Synth ..> MidiMessage : handle()
     SynthController ..> SoundFont : loads instruments.sf2
     Voice *-- Oscillator
-    Voice *-- Envelope
+    Voice *-- "2" Envelope
     Voice *-- LowPassFilter
     Oscillator <|-- SineOscillator
     Oscillator <|-- SawOscillator

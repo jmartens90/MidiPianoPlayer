@@ -20,7 +20,7 @@ ApplicationWindow {
     readonly property SynthController engine: synth   // voor delegates met een eigen "synth"-property
     readonly property bool isAndroid: Qt.platform.os === "android"
     readonly property bool compact: height < 560
-    property int panel: 0            // 0 = Synth, 1 = Effects, 2 = Sequencer
+    property int panel: 0            // 0 = Synth, 1 = Mod, 2 = Effects, 3 = Sequencer
     property bool expanded: false    // paneel groot (toetsenbord klein)
     property int patchRevision: 0    // telt bij elke patch-wijziging, voor bindings op synth.param()
     readonly property int panelHeight: expanded ? Math.round(height * 0.62) : (compact ? 74 : 110)
@@ -306,7 +306,7 @@ ApplicationWindow {
             Layout.fillWidth: true
             spacing: 2
             Repeater {
-                model: [qsTr("Synth"), qsTr("Effects"), qsTr("Sequencer")]
+                model: [qsTr("Synth"), qsTr("Mod"), qsTr("Effects"), qsTr("Sequencer")]
                 Button {
                     required property int index
                     required property string modelData
@@ -323,7 +323,7 @@ ApplicationWindow {
             }
             Item { Layout.fillWidth: true }
             Label {
-                visible: synth.stepSequencerRunning && window.panel !== 2
+                visible: synth.stepSequencerRunning && window.panel !== 3
                 text: qsTr("Sequencer playing")
                 color: window.Material.accent
                 font.pixelSize: 11
@@ -419,7 +419,98 @@ ApplicationWindow {
                 }
             }
 
-            // 1: Effects - echo en galm, voor elk instrument.
+            // 1: Mod - twee LFO's en een modulatie-envelope, elk met een doel (de knop waar ze aan
+            // draaien) en een diepte (min = omgekeerd). Gemoduleerde knoppen krijgen een oranje bolletje.
+            RowLayout {
+                spacing: window.compact ? 6 : 14
+                enabled: synth.synthControlsEnabled
+                opacity: enabled ? 1 : 0.35
+
+                Repeater {
+                    model: [{ id: "lfo1", title: qsTr("LFO 1") }, { id: "lfo2", title: qsTr("LFO 2") }]
+                    RowLayout {
+                        required property var modelData
+                        required property int index
+                        spacing: window.compact ? 2 : 6
+                        Layout.alignment: Qt.AlignTop
+                        ColumnLayout {
+                            spacing: 0
+                            Layout.alignment: Qt.AlignTop
+                            Label { text: modelData.title; font.bold: true; font.pixelSize: 12 }
+                            ComboBox {
+                                Layout.preferredWidth: window.compact ? 104 : 124
+                                implicitHeight: window.compact ? 30 : 38
+                                topInset: 0; bottomInset: 0
+                                font.pixelSize: 12
+                                focusPolicy: Qt.NoFocus
+                                model: synth.modTargetNames
+                                currentIndex: window.patchRevision >= 0 ? Math.round(synth.param(modelData.id + "_target")) : 0
+                                onActivated: (i) => synth.setParam(modelData.id + "_target", i)
+                            }
+                            ComboBox {
+                                Layout.preferredWidth: window.compact ? 104 : 124
+                                implicitHeight: window.compact ? 30 : 38
+                                topInset: 0; bottomInset: 0
+                                font.pixelSize: 12
+                                focusPolicy: Qt.NoFocus
+                                model: synth.lfoShapeNames
+                                currentIndex: window.patchRevision >= 0 ? Math.round(synth.param(modelData.id + "_shape")) : 0
+                                onActivated: (i) => synth.setParam(modelData.id + "_shape", i)
+                            }
+                            CheckBox {
+                                text: qsTr("Retrig")
+                                font.pixelSize: 11
+                                padding: 0
+                                implicitHeight: 26
+                                focusPolicy: Qt.NoFocus
+                                checked: window.patchRevision >= 0 && synth.param(modelData.id + "_retrig") >= 0.5
+                                onToggled: synth.setParam(modelData.id + "_retrig", checked ? 1 : 0)
+                            }
+                        }
+                        KnobStrip {
+                            Layout.alignment: Qt.AlignTop
+                            engine: window.engine
+                            compact: window.compact
+                            model: [
+                                { param: modelData.id + "_rate", label: qsTr("Rate"), from: 0.05, to: 20, log: true, unit: " Hz" },
+                                { param: modelData.id + "_amount", label: qsTr("Amount"), from: -1, to: 1 }
+                            ]
+                        }
+                        Rectangle { width: 1; Layout.fillHeight: true; color: "#2b2d36" }
+                    }
+                }
+
+                ColumnLayout {
+                    spacing: 0
+                    Layout.alignment: Qt.AlignTop
+                    Label { text: qsTr("Mod env"); font.bold: true; font.pixelSize: 12 }
+                    ComboBox {
+                        Layout.preferredWidth: window.compact ? 104 : 124
+                        implicitHeight: window.compact ? 30 : 38
+                        topInset: 0; bottomInset: 0
+                        font.pixelSize: 12
+                        focusPolicy: Qt.NoFocus
+                        model: synth.modTargetNames
+                        currentIndex: window.patchRevision >= 0 ? Math.round(synth.param("env2_target")) : 0
+                        onActivated: (i) => synth.setParam("env2_target", i)
+                    }
+                }
+                KnobStrip {
+                    Layout.alignment: Qt.AlignTop
+                    engine: window.engine
+                    compact: window.compact
+                    model: [
+                        { param: "env2_attack", label: qsTr("Attack"), from: 0.001, to: 4, log: true, unit: " s" },
+                        { param: "env2_decay", label: qsTr("Decay"), from: 0.01, to: 4, log: true, unit: " s" },
+                        { param: "env2_sustain", label: qsTr("Sustain"), from: 0, to: 1 },
+                        { param: "env2_release", label: qsTr("Release"), from: 0.01, to: 4, log: true, unit: " s" },
+                        { param: "env2_amount", label: qsTr("Amount"), from: -1, to: 1 }
+                    ]
+                }
+                Item { Layout.fillWidth: true }
+            }
+
+            // 2: Effects - echo en galm, voor elk instrument.
             RowLayout {
                 spacing: window.compact ? 6 : 14
 
@@ -485,7 +576,7 @@ ApplicationWindow {
                 Item { Layout.fillWidth: true }
             }
 
-            // 2: Sequencer.
+            // 3: Sequencer.
             SequencerPanel {
                 engine: window.engine
                 compact: window.compact

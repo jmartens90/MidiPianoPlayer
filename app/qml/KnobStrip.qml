@@ -35,6 +35,7 @@ Row {
             decimals: modelData.dec === undefined ? 2 : modelData.dec
             enabled: kind === "all" || (strip.synthEnabled && (kind === "synth" || strip.wavetableEnabled))
             opacity: enabled ? 1 : 0.35
+            modulated: strip.engine.modulatedParams.indexOf(modelData.param) >= 0
         }
     }
 }

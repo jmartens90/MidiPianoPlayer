@@ -9,6 +9,7 @@ add_library(midipiano_core STATIC
   src/Envelope.cpp
   src/LowPassFilter.cpp
   src/MidiMessage.cpp
+  src/Modulation.cpp
   src/Patch.cpp
   src/PresetStore.cpp
   src/Reverb.cpp

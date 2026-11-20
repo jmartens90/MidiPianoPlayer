@@ -16,6 +16,7 @@ Item {
     property int decimals: 2
     property int dialSize: 58
     property bool compact: false
+    property bool modulated: false   // een LFO of de modulatie-envelope draait aan deze knop
 
     implicitWidth: 66
     implicitHeight: column.implicitHeight
@@ -60,6 +61,13 @@ Item {
             focusPolicy: Qt.NoFocus
             onMoved: root.synth.setParam(root.paramName, root.toParam(value))
             Component.onCompleted: root.reload()
+        }
+        Rectangle {
+            visible: root.modulated
+            width: 8; height: 8; radius: 4
+            color: "#ff9f43"
+            anchors.right: parent.right
+            anchors.top: parent.top
         }
         }
         Label {

@@ -10,7 +10,9 @@
 #include "midipiano/dsp/Delay.h"
 #include "midipiano/dsp/LowPassFilter.h"
 #include "midipiano/dsp/Reverb.h"
+#include "midipiano/dsp/Modulation.h"
 #include "midipiano/dsp/Synth.h"
+#include "midipiano/dsp/VoiceSynth.h"
 #include "midipiano/dsp/Voice.h"
 #include "midipiano/dsp/Waveforms.h"
 #include "midipiano/dsp/Wavetable.h"
@@ -243,4 +245,71 @@ TEST(scheduled_note_starts_on_the_exact_sample) {
   synth.render(buffer.data(), buffer.size(), blockStart);
   CHECK(peakOf(std::vector<float>(buffer.begin(), buffer.begin() + 249)) == 0.0f);
   CHECK(peakOf(std::vector<float>(buffer.begin() + 250, buffer.begin() + 400)) > 0.01f);
+}
+
+TEST(lfo_shapes_stay_in_range) {
+  for (int shape = 0; shape < static_cast<int>(dsp::Lfo::Shape::Count); ++shape) {
+    dsp::Lfo lfo;
+    lfo.setShape(static_cast<dsp::Lfo::Shape>(shape));
+    lfo.setRate(3.0f);
+    float low = 1.0f, high = -1.0f;
+    for (int i = 0; i < 1000; ++i) {
+      const float v = lfo.advance(0.001f);
+      low = std::min(low, v);
+      high = std::max(high, v);
+    }
+    CHECK(low >= -1.0f && high <= 1.0f);
+    CHECK(high - low > 0.5f);  // het golfje beweegt echt
+  }
+}
+
+namespace {
+// Een seconde aanhoudende sinus van de synth bij 10 kHz, met de gegeven modulatie-instellingen.
+std::vector<float> renderSynthSecond(preset::Patch patch) {
+  patch.setWaveform(dsp::Waveform::Sine);
+  patch.set("attack", 0.001f).set("sustain", 1.0f).set("cutoff", 12000.0f);
+  dsp::VoiceSynth synth(10000.0f);
+  synth.applyPatch(patch);
+  synth.noteOn(57, 100);  // 220 Hz
+  std::vector<float> buffer(10000);
+  synth.render(buffer.data(), buffer.size());
+  return buffer;
+}
+
+float loudestToQuietest(const std::vector<float>& buffer) {
+  float low = 1e9f, high = 0.0f;
+  for (std::size_t start = 1000; start + 200 <= buffer.size(); start += 200) {  // vensters van 20 ms
+    float peak = 0.0f;
+    for (std::size_t i = start; i < start + 200; ++i) peak = std::max(peak, std::fabs(buffer[i]));
+    low = std::min(low, peak);
+    high = std::max(high, peak);
+  }
+  return high / std::max(low, 1e-6f);
+}
+
+int zeroCrossings(const std::vector<float>& buffer, std::size_t from, std::size_t to) {
+  int count = 0;
+  for (std::size_t i = from + 1; i < to; ++i) count += (buffer[i - 1] < 0.0f) != (buffer[i] < 0.0f);
+  return count;
+}
+}  // namespace
+
+TEST(lfo_on_volume_makes_a_tremolo) {
+  preset::Patch plain;
+  CHECK(loudestToQuietest(renderSynthSecond(plain)) < 1.2f);  // zonder modulatie: gelijk volume
+  preset::Patch tremolo;
+  tremolo.set("lfo1_target", static_cast<float>(dsp::ModTarget::Volume)).set("lfo1_amount", 1.0f).set("lfo1_rate", 5.0f);
+  CHECK(loudestToQuietest(renderSynthSecond(tremolo)) > 3.0f);  // met LFO: luid en stil wisselen af
+}
+
+TEST(mod_envelope_bends_the_pitch) {
+  preset::Patch patch;
+  patch.set("env2_target", static_cast<float>(dsp::ModTarget::Pitch)).set("env2_amount", 1.0f);
+  patch.set("env2_attack", 0.001f).set("env2_decay", 0.3f).set("env2_sustain", 0.0f);
+  const auto buffer = renderSynthSecond(patch);
+  // Begin: een octaaf hoger (440 Hz = ~44 nuldoorgangen per 50 ms), na de decay weer 220 Hz (~22).
+  const int start = zeroCrossings(buffer, 0, 500);
+  const int end = zeroCrossings(buffer, 9000, 9500);
+  CHECK(start > 36);
+  CHECK(end > 18 && end < 26);
 }

@@ -31,6 +31,10 @@ class SynthController : public QObject {
   QML_ELEMENT
   Q_PROPERTY(int waveform READ waveform WRITE setWaveform NOTIFY patchChanged)
   Q_PROPERTY(QStringList waveformNames READ waveformNames CONSTANT)
+  // Modulatie: namen voor de keuzelijsten en welke knoppen nu gemoduleerd worden (oranje bolletje).
+  Q_PROPERTY(QStringList modTargetNames READ modTargetNames CONSTANT)
+  Q_PROPERTY(QStringList lfoShapeNames READ lfoShapeNames CONSTANT)
+  Q_PROPERTY(QStringList modulatedParams READ modulatedParams NOTIFY patchChanged)
   Q_PROPERTY(bool waveformIsWavetable READ waveformIsWavetable NOTIFY patchChanged)
   Q_PROPERTY(QString patchName READ patchName NOTIFY patchChanged)
   Q_PROPERTY(QStringList presets READ presets NOTIFY presetsChanged)
@@ -73,6 +77,9 @@ class SynthController : public QObject {
   int waveform() const;
   void setWaveform(int waveform);
   QStringList waveformNames() const;
+  QStringList modTargetNames() const;
+  QStringList lfoShapeNames() const;
+  QStringList modulatedParams() const;
   bool waveformIsWavetable() const { return dsp::isWavetable(synth_.patch().waveform()); }
   QString patchName() const { return patchName_; }
   QStringList presets() const { return presets_; }

@@ -12,6 +12,16 @@ Patch::Patch() : name_("Init"), waveform_(dsp::Waveform::Analog) {
                              Param("position", 0.0f, 1.0f, 0.66f),
                              Param("resonance", 0.0f, 1.0f, 0.2f), Param("drive", 1.0f, 10.0f, 1.0f),
                              Param("envmod", 0.0f, 1.0f, 0.0f),
+                             // Modulatie: 2 LFO's en een modulatie-envelope, elk met een doel (ModTarget) en diepte.
+                             Param("lfo1_target", 0.0f, 6.0f, 0.0f), Param("lfo1_shape", 0.0f, 4.0f, 0.0f),
+                             Param("lfo1_rate", 0.05f, 20.0f, 5.0f), Param("lfo1_amount", -1.0f, 1.0f, 0.3f),
+                             Param("lfo1_retrig", 0.0f, 1.0f, 0.0f),
+                             Param("lfo2_target", 0.0f, 6.0f, 0.0f), Param("lfo2_shape", 0.0f, 4.0f, 1.0f),
+                             Param("lfo2_rate", 0.05f, 20.0f, 0.3f), Param("lfo2_amount", -1.0f, 1.0f, 0.5f),
+                             Param("lfo2_retrig", 0.0f, 1.0f, 0.0f),
+                             Param("env2_target", 0.0f, 6.0f, 0.0f), Param("env2_amount", -1.0f, 1.0f, 0.5f),
+                             Param("env2_attack", 0.001f, 4.0f, 0.01f), Param("env2_decay", 0.01f, 4.0f, 0.5f),
+                             Param("env2_sustain", 0.0f, 1.0f, 0.0f), Param("env2_release", 0.01f, 4.0f, 0.3f),
                              // Galm: mix, predelay (s), uitklinktijd, demping, low cut voor en high cut na de galm.
                              Param("reverb", 0.0f, 1.0f, 0.25f), Param("reverb_predelay", 0.0f, 0.25f, 0.02f),
                              Param("reverb_decay", 0.0f, 1.0f, 0.6f), Param("reverb_damp", 0.0f, 1.0f, 0.3f),

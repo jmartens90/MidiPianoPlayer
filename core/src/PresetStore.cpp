@@ -97,10 +97,17 @@ void PresetStore::installFactoryPresets() const {
   acid.setWaveform(Waveform::Saw).set("attack", 0.001f).set("decay", 0.18f).set("sustain", 0.2f).set("release", 0.1f).set("cutoff", 250.0f).set("resonance", 0.92f).set("drive", 6.0f).set("envmod", 0.7f).set("reverb", 0.1f);
   acid.setName("Nasty Acid");
 
+  // Modulatie: LFO 1 draait de cutoff heen en weer (wobble), LFO 2 morpht traag de wavetable.
+  Patch wobble;
+  wobble.setWaveform(Waveform::Analog).set("attack", 0.005f).set("sustain", 0.9f).set("release", 0.15f).set("cutoff", 400.0f).set("resonance", 0.6f).set("drive", 3.0f);
+  wobble.set("lfo1_target", 2.0f).set("lfo1_shape", 0.0f).set("lfo1_rate", 4.0f).set("lfo1_amount", 0.8f).set("lfo1_retrig", 1.0f);
+  wobble.set("lfo2_target", 4.0f).set("lfo2_shape", 1.0f).set("lfo2_rate", 0.2f).set("lfo2_amount", 0.7f).set("reverb", 0.15f);
+  wobble.setName("Wobble");
+
   // Vereiste 38: 38.at least 4 useful const references for variables (3/4)
-  // patch verwijst naar elk van de vijf presets in de lijst: zonder kopie en alleen-lezen, want
+  // patch verwijst naar elk van de zes presets in de lijst: zonder kopie en alleen-lezen, want
   // opslaan mag een patch niet wijzigen.
-  for (const Patch& patch : {pad, lead, pluck, organ, acid}) {
+  for (const Patch& patch : {pad, lead, pluck, organ, acid, wobble}) {
     if (!exists(patch.name())) save(patch);
   }
 }
