@@ -473,11 +473,13 @@ ApplicationWindow {
                     compact: window.compact
                     model: [
                         { param: "reverb", label: qsTr("Mix"), from: 0, to: 1 },
-                        { param: "reverb_predelay", label: qsTr("Predelay"), from: 0, to: 0.25, unit: " s" },
+                        { param: "reverb_size", label: qsTr("Size"), from: 0, to: 1 },
                         { param: "reverb_decay", label: qsTr("Decay"), from: 0, to: 1 },
+                        { param: "reverb_predelay", label: qsTr("Predelay"), from: 0, to: 0.25, unit: " s" },
                         { param: "reverb_damp", label: qsTr("Damping"), from: 0, to: 1 },
                         { param: "reverb_lowcut", label: qsTr("Low cut"), from: 20, to: 1000, log: true, unit: " Hz", dec: 0 },
-                        { param: "reverb_highcut", label: qsTr("High cut"), from: 1000, to: 16000, log: true, unit: " Hz", dec: 0 }
+                        { param: "reverb_highcut", label: qsTr("High cut"), from: 1000, to: 16000, log: true, unit: " Hz", dec: 0 },
+                        { param: "reverb_width", label: qsTr("Width"), from: 0, to: 1 }
                     ]
                 }
                 Item { Layout.fillWidth: true }

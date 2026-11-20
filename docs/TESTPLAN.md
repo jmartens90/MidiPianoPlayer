@@ -25,7 +25,7 @@ them on every push.
 | Files | `preset_round_trip`, `preset_errors_are_reported`, `factory_presets_are_installed_once` | save + load gives the same patch; missing, corrupt or unknown files give a `PresetError` |
 | Threads | `sequencer_works_through_base_class`, `sequencer_stops_quickly_even_when_slow` | the sequencer thread sends matching on/off pairs and stops within 200 ms |
 | Samples | `soundfont_loads_the_piano_presets`, `piano_plays_and_stops_through_the_synth`, `instruments_share_one_soundfont` | the SoundFont loads, the piano sounds and stops, instruments share one font |
-| Effects | `sustain_pedal_*`, `reverb_*`, `resonant_filter_rings_and_can_self_oscillate` | pedal holds notes, reverb tail and predelay, filter self-oscillates at full resonance |
+| Effects | `sustain_pedal_*`, `reverb_*`, `resonant_filter_rings_and_can_self_oscillate` | pedal holds notes, reverb tail and predelay, stereo width, stable at maximum decay, filter self-oscillates at full resonance |
 | Wavetables | `wavetable_morphs_and_avoids_aliasing`, `every_wavetable_waveform_plays_through_a_voice` | Position morphs, high notes use a band-limited table, every table sounds |
 | Delay | `delay_repeats_the_sound_at_the_right_time`, `delay_syncs_to_the_sequencer_tempo` | echoes arrive at the set time and get softer; sync uses the tempo |
 | Step sequencer | `step_sequencer_plays_active_steps_in_time` | only active steps play, accent = velocity 127, transpose works, stop is immediate |
@@ -66,3 +66,4 @@ Do this on the desktop build and on an Android phone.
 | 25 | Sequencer tab → Key on, hold C2, then D2, then let go | C2 plays the pattern from step 1, D2 restarts it a tone higher, letting go stops it |
 | 26 | Load a preset on a phone | "Loaded ..." appears above the keyboard for 3 seconds and does not cover the header |
 | 27 | On Android: open the app, let the phone go to sleep, wake it and unlock | Playing works right away, no restart needed |
+| 28 | Effects tab: Reverb Mix up, play a chord with headphones, turn Width from 1 to 0 and Size from 0 to 1 | Wide: the tail fills both ears; Width 0: it sits in the middle. Size 0 sounds like a small room, 1 like a hall |

@@ -22,7 +22,7 @@ AudioOutput::AudioOutput(dsp::Synth& synth, unsigned int periodMs)
     : synth_(synth), device_(std::make_unique<ma_device>()) {
   ma_device_config config = ma_device_config_init(ma_device_type_playback);
   config.playback.format = ma_format_f32;
-  config.playback.channels = 1;
+  config.playback.channels = 2;  // stereo: de galm klinkt links en rechts anders
   config.sampleRate = 0;  // 0 = de eigen samplerate van de geluidskaart (meestal 48000)
   config.performanceProfile = ma_performance_profile_low_latency;
 #ifdef __ANDROID__
@@ -75,7 +75,7 @@ unsigned int AudioOutput::bufferFrames() const { return device_->playback.intern
 void AudioOutput::dataCallback(ma_device* device, void* output, const void* /*input*/, unsigned int frameCount) {
   auto* self = static_cast<AudioOutput*>(device->pUserData);
   self->lastCallbackNs_.store(nowNs(), std::memory_order_relaxed);
-  self->synth_.render(static_cast<float*>(output), frameCount);
+  self->synth_.renderStereo(static_cast<float*>(output), frameCount);
 }
 
 }  // namespace midipiano::audio

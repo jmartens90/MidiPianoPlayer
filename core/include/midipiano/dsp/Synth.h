@@ -61,6 +61,8 @@ class Synth {
   void render(float* out, std::size_t frames);
   void render(float* out, std::size_t frames, Clock::time_point blockStart);
   void render(std::vector<float>& buffer);
+  // Stereo: frames paren links/rechts na elkaar (zo vraagt de geluidskaart het).
+  void renderStereo(float* interleaved, std::size_t frames);
 
   void setSampleRate(float sampleRate);
   float sampleRate() const;
@@ -85,6 +87,7 @@ class Synth {
   void allNotesOffLocked();
   void setSustainLocked(bool down);
   void renderInstruments(float* out, std::size_t frames);
+  void renderLocked(float* left, float* right, std::size_t frames, Clock::time_point blockStart);
 
   struct Scheduled {
     Clock::time_point when;
@@ -104,6 +107,7 @@ class Synth {
   preset::Patch patch_;
   float sampleRate_;
   std::vector<float> scratch_;
+  std::vector<float> left_, right_;  // werkbuffers voor stereo
   Delay delay_;
   Reverb reverb_;
   float tempo_ = 120.0f;

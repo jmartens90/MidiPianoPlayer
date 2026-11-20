@@ -83,11 +83,51 @@ TEST(reverb_predelay_delays_the_first_reflection) {
   std::vector<float> buffer(4000, 0.0f);
   buffer[0] = 1.0f;
   reverb.process(buffer.data(), buffer.size());
-  // Voor predelay + de kortste kamfilter (~250 samples) mag er nog geen galm zijn.
+  // Voor de predelay (2000 samples) mag er nog geen galm zijn, kort erna wel (eerste reflectie).
   float early = 0.0f;
-  for (std::size_t i = 1; i < 2200; ++i) early = std::max(early, std::fabs(buffer[i]));
+  for (std::size_t i = 1; i < 2000; ++i) early = std::max(early, std::fabs(buffer[i]));
   CHECK(early < 1e-6f);
-  CHECK(peakOf(buffer, 2200) > 1e-4f);
+  CHECK(peakOf(buffer, 2000) > 1e-4f);
+}
+
+TEST(reverb_is_stereo_and_width_controls_it) {
+  auto difference = [](float width) {
+    dsp::Reverb reverb(22050.0f);
+    dsp::Reverb::Settings settings;
+    settings.mix = 1.0f;
+    settings.width = width;
+    reverb.setSettings(settings);
+    std::vector<float> in(22050, 0.0f), left(22050), right(22050);
+    in[0] = 1.0f;
+    reverb.process(in.data(), left.data(), right.data(), in.size());
+    float diff = 0.0f;
+    for (std::size_t i = 0; i < in.size(); ++i) diff = std::max(diff, std::fabs(left[i] - right[i]));
+    return diff;
+  };
+  CHECK(difference(1.0f) > 0.001f);  // breed: links en rechts hoor je een andere galm
+  CHECK(difference(0.0f) < 1e-6f);   // breedte 0: mono
+}
+
+TEST(reverb_stays_stable_at_maximum_decay) {
+  dsp::Reverb reverb(22050.0f);
+  dsp::Reverb::Settings settings;
+  settings.mix = 1.0f;
+  settings.decay = 1.0f;
+  settings.size = 1.0f;
+  settings.damping = 0.0f;
+  reverb.setSettings(settings);
+  std::vector<float> buffer(22050 * 10, 0.0f);  // 10 seconden
+  for (std::size_t i = 0; i < 2205; ++i) buffer[i] = std::sin(i * 0.1f) * 0.5f;
+  reverb.process(buffer.data(), buffer.size());
+  float peak = 0.0f;
+  bool finite = true;
+  for (float x : buffer) {
+    peak = std::max(peak, std::fabs(x));
+    finite = finite && std::isfinite(x);
+  }
+  CHECK(finite);
+  CHECK(peak < 2.0f);                        // groeit niet uit de hand
+  CHECK(peakOf(buffer, 22050 * 3) > 1e-4f);  // maar galmt na 3 s nog wel
 }
 
 TEST(resonant_filter_rings_and_can_self_oscillate) {

@@ -29,7 +29,7 @@ plays the same kind of pattern.
 * A 16-step sequencer: tempo, gate, swing, accents, and a note grid in the big view. It plays on its
   own thread with drift-free timing.
 * A delay (echo) with feedback, tone and tempo sync (1/16 to 1/2, dotted values too).
-* A sustain pedal (button, space bar or MIDI CC 64) and a Freeverb-style reverb that works on every instrument.
+* A sustain pedal (button, space bar or MIDI CC 64) and a stereo plate reverb (Dattorro design, with early reflections and a slowly modulated tail) that works on every instrument.
 * On Android the app always runs in landscape, with a compact control bar so the keyboard gets the most room.
 
 ![Phone, landscape](docs/images/phone-landscape.png)
@@ -139,7 +139,7 @@ From a key press on the PSoC 6 to sound is roughly 20 to 35 ms. To keep the rhyt
 | Env→Filt | (Synth only) How far the envelope opens the filter on every note (the "acid" squelch) |
 | Synth / Effects / Sequencer | Tabs above the knobs. **More** / **Less** makes the panel big or small |
 | Delay (Effects) | Mix, Feedback, Tone, and Time, or with **Sync** on a note value that follows the sequencer tempo |
-| Reverb (Effects) | Mix, Predelay, Decay, Damping, Low cut (pre-filter on the reverb input) and High cut (post-filter on the reverb output) |
+| Reverb (Effects) | Mix, Size (room to hall), Decay, Predelay, Damping, Low cut (pre-filter on the reverb input) and High cut (post-filter on the reverb output), Width (mono to wide stereo) |
 | Sequencer | Play/Stop, Tempo, Gate, Swing. Tap a step to switch it on or off. In the big view, tap a cell to put that note on that step, and use the bottom row for accents; Octave −/+ moves the grid, Clear and Reset change the whole pattern. **Key**: each key you press (on screen or over Bluetooth) restarts the pattern from step 1, transposed: C2 plays it as written, D2 a tone higher; releasing the key stops it |
 | Volume | Master volume |
 | Pedal | Sustain pedal: released notes keep ringing until you turn it off. On a PC you can also hold the space bar |
@@ -243,6 +243,7 @@ classDiagram
         +noteOff(note)
         +setSustain(bool)
         +render(vector~float~&)
+        +renderStereo(float*, frames)
         +addInstrument(unique_ptr~Instrument~)
         +selectInstrument(index)
         +applyPatch(const Patch&)
@@ -262,11 +263,11 @@ classDiagram
     }
     class Reverb {
         -Settings settings_
-        -vector~float~ predelayLine_
-        -vector~Comb~ combs_
-        -vector~Allpass~ allpasses_
+        -DelayLine predelay_
+        -array~Allpass,4~ diffusers_
+        -DelayLine delayA_[2], delayB_[2]
         +setSettings(const Settings&)
-        +process(float*, frames)
+        +process(in, left, right, frames)
     }
     class Voice {
         -unique_ptr~Oscillator~ oscillator_

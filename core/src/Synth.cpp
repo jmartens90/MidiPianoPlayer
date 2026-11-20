@@ -111,6 +111,23 @@ void Synth::render(float* out, std::size_t frames) {
 
 void Synth::render(float* out, std::size_t frames, Clock::time_point blockStart) {
   std::lock_guard<std::mutex> lock(mutex_);
+  if (right_.size() < frames) right_.resize(frames);
+  renderLocked(out, right_.data(), frames, blockStart);
+  for (std::size_t i = 0; i < frames; ++i) out[i] = 0.5f * (out[i] + right_[i]);  // mono: L+R samen
+}
+
+void Synth::renderStereo(float* interleaved, std::size_t frames) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (left_.size() < frames) left_.resize(frames);
+  if (right_.size() < frames) right_.resize(frames);
+  renderLocked(left_.data(), right_.data(), frames, Clock::now());
+  for (std::size_t i = 0; i < frames; ++i) {
+    interleaved[2 * i] = left_[i];
+    interleaved[2 * i + 1] = right_[i];
+  }
+}
+
+void Synth::renderLocked(float* out, float* right, std::size_t frames, Clock::time_point blockStart) {
   if (scratch_.size() < frames) scratch_.resize(frames);  // gebeurt hooguit een keer
   std::fill(out, out + frames, 0.0f);
 
@@ -136,11 +153,13 @@ void Synth::render(float* out, std::size_t frames, Clock::time_point blockStart)
   }
 
   delay_.process(out, frames);    // echo voor de galm: de echo's krijgen ook galm
-  reverb_.process(out, frames);  // ook als er geen noten meer zijn: dan sterft de galm uit
+  // De galm maakt van het mono signaal stereo (ook als er geen noten meer zijn: dan sterft hij uit).
+  reverb_.process(out, out, right, frames);
   const float volume = patch_.get("volume");
   for (std::size_t i = 0; i < frames; ++i) {
     out[i] = std::tanh(out[i] * volume);  // zachte begrenzing: een vol akkoord clipt niet
-    scope_.push(out[i]);
+    right[i] = std::tanh(right[i] * volume);
+    scope_.push(0.5f * (out[i] + right[i]));
   }
 }
 
@@ -221,6 +240,8 @@ void Synth::applyReverbSettings() {
   settings.damping = patch_.get("reverb_damp");
   settings.lowCutHz = patch_.get("reverb_lowcut");
   settings.highCutHz = patch_.get("reverb_highcut");
+  settings.size = patch_.get("reverb_size");
+  settings.width = patch_.get("reverb_width");
   reverb_.setSettings(settings);
 }
 
