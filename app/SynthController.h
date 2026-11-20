@@ -123,6 +123,7 @@ class SynthController : public QObject {
   void onSourceMessage(const midi::MidiMessage& message);
   void onTimedMessage(const midi::MidiMessage& message, dsp::Synth::Clock::time_point when);
   void openAudio();
+  void reopenAudio();
   void onLiveMessage(const midi::MidiMessage& message);
   void followNoteOn(int note);
   void followNoteOff(int note);
@@ -153,6 +154,8 @@ class SynthController : public QObject {
   int bufferMs_ = 0;
   bool steadyTiming_ = true;
   bool keyFollow_ = false;
+  int failedReopens_ = 0;
+  std::chrono::steady_clock::time_point lastReopen_ = std::chrono::steady_clock::now();
   std::vector<int> heldKeys_;  // ingedrukte toetsen in key-follow-modus, de laatste bepaalt de toonhoogte
   std::chrono::milliseconds lookahead_{15};  // hoe ver vooruit noten ingepland worden
 };

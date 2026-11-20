@@ -1,6 +1,9 @@
 #ifndef MIDIPIANO_AUDIO_AUDIOOUTPUT_H
 #define MIDIPIANO_AUDIO_AUDIOOUTPUT_H
 
+#include <atomic>
+#include <chrono>
+#include <cstdint>
 #include <memory>
 #include <stdexcept>
 
@@ -37,6 +40,10 @@ class AudioOutput {
   void resume();
   bool isPaused() const { return paused_; }
 
+  // true als de geluidskaart al "limit" lang geen blok meer gevraagd heeft terwijl hij zou moeten
+  // spelen. Op Android gebeurt dat na slaapstand: de AAudio-stream is dan stilletjes afgesloten.
+  bool isStalled(std::chrono::milliseconds limit) const;
+
   float sampleRate() const;
   unsigned int bufferFrames() const;
   double blockMilliseconds() const { return 1000.0 * bufferFrames() / sampleRate(); }
@@ -47,6 +54,9 @@ class AudioOutput {
   dsp::Synth& synth_;
   std::unique_ptr<ma_device> device_;
   bool paused_ = false;
+  // Tijdstip (steady_clock, in ns) van de laatste callback, of van de start. Atomair: de
+  // audio-thread schrijft, de GUI-thread leest.
+  std::atomic<std::int64_t> lastCallbackNs_{0};
 };
 
 }  // namespace midipiano::audio

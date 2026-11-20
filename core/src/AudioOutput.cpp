@@ -6,6 +6,12 @@
 
 namespace midipiano::audio {
 
+namespace {
+std::int64_t nowNs() {
+  return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+}  // namespace
+
 // Vereiste 58: 58.useful (non trivial) usage of an external library (not Qt)
 // miniaudio praat met de geluidskaart op elk platform (WASAPI op Windows, Core Audio op macOS,
 // PulseAudio/ALSA op Linux, AAudio op Android) met dezelfde code. We openen een playback-apparaat met
@@ -36,6 +42,7 @@ AudioOutput::AudioOutput(dsp::Synth& synth, unsigned int periodMs)
     throw AudioError("geen geluidskaart gevonden");
   }
   synth_.setSampleRate(static_cast<float>(device_->sampleRate));
+  lastCallbackNs_ = nowNs();
   if (ma_device_start(device_.get()) != MA_SUCCESS) {
     ma_device_uninit(device_.get());
     throw AudioError("kan de geluidskaart niet starten");
@@ -52,7 +59,13 @@ void AudioOutput::pause() {
 
 void AudioOutput::resume() {
   if (!paused_) return;
+  lastCallbackNs_ = nowNs();
   if (ma_device_start(device_.get()) == MA_SUCCESS) paused_ = false;
+}
+
+bool AudioOutput::isStalled(std::chrono::milliseconds limit) const {
+  if (paused_) return false;
+  return nowNs() - lastCallbackNs_.load() > std::chrono::duration_cast<std::chrono::nanoseconds>(limit).count();
 }
 
 float AudioOutput::sampleRate() const { return static_cast<float>(device_->sampleRate); }
@@ -61,6 +74,7 @@ unsigned int AudioOutput::bufferFrames() const { return device_->playback.intern
 
 void AudioOutput::dataCallback(ma_device* device, void* output, const void* /*input*/, unsigned int frameCount) {
   auto* self = static_cast<AudioOutput*>(device->pUserData);
+  self->lastCallbackNs_.store(nowNs(), std::memory_order_relaxed);
   self->synth_.render(static_cast<float*>(output), frameCount);
 }
 

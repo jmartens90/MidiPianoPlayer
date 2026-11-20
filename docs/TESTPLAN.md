@@ -65,3 +65,4 @@ Do this on the desktop build and on an Android phone.
 | 24 | Play fast notes from the PSoC 6 with "Steady Bluetooth timing" on, then off | On: the rhythm is even. Off: notes come slightly sooner but with uneven timing |
 | 25 | Sequencer tab → Key on, hold C2, then D2, then let go | C2 plays the pattern from step 1, D2 restarts it a tone higher, letting go stops it |
 | 26 | Load a preset on a phone | "Loaded ..." appears above the keyboard for 3 seconds and does not cover the header |
+| 27 | On Android: open the app, let the phone go to sleep, wake it and unlock | Playing works right away, no restart needed |

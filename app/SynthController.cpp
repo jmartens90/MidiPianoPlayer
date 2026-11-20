@@ -165,7 +165,9 @@ void SynthController::onApplicationStateChanged(Qt::ApplicationState state) {
     synth_.allNotesOff();
     if (audio_) audio_->pause();
   } else if (state == Qt::ApplicationActive) {
-    if (audio_) audio_->resume();
+    // Na slaapstand is de AAudio-stream op Android vaak dood: opnieuw starten lukt dan "zonder
+    // fout" maar er komt geen geluid. Daarom openen we de geluidskaart gewoon helemaal opnieuw.
+    if (!audio_ || audio_->isPaused()) reopenAudio();
   }
 }
 
@@ -176,6 +178,15 @@ void SynthController::openAudio() {
   } catch (const audio::AudioError& e) {
     setStatus(QStringLiteral("No sound: %1").arg(QString::fromUtf8(e.what())));
   }
+}
+
+void SynthController::reopenAudio() {
+  synth_.allNotesOff();
+  openAudio();
+  failedReopens_ = audio_ ? 0 : failedReopens_ + 1;  // zonder geluidskaart niet eindeloos opnieuw proberen
+  updateTiming();
+  lastReopen_ = std::chrono::steady_clock::now();
+  emit audioChanged();
 }
 
 void SynthController::updateTiming() {
@@ -404,6 +415,15 @@ void SynthController::refreshPresets() {
 }
 
 void SynthController::onTick() {
+  // Waakhond: vraagt de geluidskaart al 1,5 s geen samples meer (stream weggevallen door slaapstand,
+  // koptelefoon uitgetrokken, ...) terwijl de app actief is, dan openen we hem opnieuw. Hoogstens
+  // om de 3 s, zodat een kapotte geluidskaart de app niet blijft herstarten.
+  if (qGuiApp->applicationState() == Qt::ApplicationActive &&
+      std::chrono::steady_clock::now() - lastReopen_ > std::chrono::seconds(3) &&
+      ((audio_ && audio_->isStalled(std::chrono::milliseconds(1500))) || (!audio_ && failedReopens_ < 5))) {
+    reopenAudio();
+  }
+
   const int voices = static_cast<int>(synth_.activeVoiceCount());
   if (voices != activeVoices_) {
     activeVoices_ = voices;
