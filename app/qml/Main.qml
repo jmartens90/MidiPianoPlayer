@@ -20,6 +20,10 @@ ApplicationWindow {
     readonly property SynthController engine: synth   // voor delegates met een eigen "synth"-property
     readonly property bool isAndroid: Qt.platform.os === "android"
     readonly property bool compact: height < 560
+    property int panel: 0            // 0 = Synth, 1 = Effects, 2 = Sequencer
+    property bool expanded: false    // paneel groot (toetsenbord klein)
+    property int patchRevision: 0    // telt bij elke patch-wijziging, voor bindings op synth.param()
+    readonly property int panelHeight: expanded ? Math.round(height * 0.62) : (compact ? 74 : 110)
 
     width: 1180
     height: 700
@@ -49,6 +53,7 @@ ApplicationWindow {
     Connections {
         target: synth
         function onNoteStateChanged(note, on) { keyboard.setLit(note, on) }
+        function onPatchChanged() { window.patchRevision++ }
     }
 
     header: ToolBar {
@@ -237,45 +242,6 @@ ApplicationWindow {
         }
     }
 
-    // Galm-instellingen: werken voor elk instrument, ook de piano.
-    Popup {
-        id: reverbPanel
-        anchors.centerIn: parent
-        modal: true
-        padding: 16
-        onClosed: keyboard.forceActiveFocus()
-        Column {
-            spacing: 8
-            Label { text: qsTr("Reverb"); font.bold: true; font.pixelSize: 16 }
-            Row {
-                spacing: 8
-                Repeater {
-                    model: [
-                        { param: "reverb", label: qsTr("Mix"), from: 0, to: 1, log: false, unit: "", dec: 2 },
-                        { param: "reverb_predelay", label: qsTr("Predelay"), from: 0, to: 0.25, log: false, unit: " s", dec: 2 },
-                        { param: "reverb_decay", label: qsTr("Decay"), from: 0, to: 1, log: false, unit: "", dec: 2 },
-                        { param: "reverb_damp", label: qsTr("Damping"), from: 0, to: 1, log: false, unit: "", dec: 2 },
-                        { param: "reverb_lowcut", label: qsTr("Low cut (pre)"), from: 20, to: 1000, log: true, unit: " Hz", dec: 0 },
-                        { param: "reverb_highcut", label: qsTr("High cut (post)"), from: 1000, to: 16000, log: true, unit: " Hz", dec: 0 }
-                    ]
-                    Knob {
-                        required property var modelData
-                        width: 100
-                        dialSize: 58
-                        synth: window.engine
-                        paramName: modelData.param
-                        label: modelData.label
-                        from: modelData.from
-                        to: modelData.to
-                        logarithmic: modelData.log
-                        unit: modelData.unit
-                        decimals: modelData.dec
-                    }
-                }
-            }
-        }
-    }
-
     Dialog {
         id: saveDialog
         title: qsTr("Save preset")
@@ -297,90 +263,177 @@ ApplicationWindow {
         anchors.margins: window.compact ? 6 : 12
         spacing: window.compact ? 4 : 10
 
-        // Klankregeling: golfvorm, knoppen en oscilloscoop op een rij.
+        // Bovenaan de panelen: tabbladen en een knop om het paneel groot te maken (zoals bij een
+        // Arturia-synth). Uitgeklapt krijgt het paneel meer dan de helft van het scherm.
         RowLayout {
-            id: controls
             Layout.fillWidth: true
-            Layout.fillHeight: false   // geneste layouts vullen standaard; het toetsenbord krijgt de rest
-            Layout.preferredHeight: window.compact ? 74 : 110
-            Layout.maximumHeight: window.compact ? 74 : 110
-            spacing: window.compact ? 8 : 16
-
-            ColumnLayout {
-                spacing: 2
-                enabled: synth.synthControlsEnabled
-                opacity: enabled ? 1 : 0.35
-                Label { text: qsTr("Wave"); opacity: 0.75; font.pixelSize: 11 }
-                // Vier klassieke golfvormen en zes wavetables (Analog, Harmonics, PWM, Sync, Formant, Fold).
-                ComboBox {
-                    Layout.preferredWidth: window.compact ? 118 : 140
-                    model: synth.waveformNames
-                    currentIndex: synth.waveform
+            spacing: 2
+            Repeater {
+                model: [qsTr("Synth"), qsTr("Effects"), qsTr("Sequencer")]
+                Button {
+                    required property int index
+                    required property string modelData
+                    text: modelData
+                    flat: window.panel !== index
+                    highlighted: window.panel === index
                     focusPolicy: Qt.NoFocus
-                    onActivated: (index) => synth.waveform = index
+                    implicitHeight: window.compact ? 30 : 36
+                    topInset: 0
+                    bottomInset: 0
+                    font.pixelSize: window.compact ? 11 : 13
+                    onClicked: window.panel = index
                 }
             }
+            Item { Layout.fillWidth: true }
+            Label {
+                visible: synth.stepSequencerRunning && window.panel !== 2
+                text: qsTr("Sequencer playing")
+                color: window.Material.accent
+                font.pixelSize: 11
+            }
+            ToolButton {
+                text: window.expanded ? qsTr("▾ Less") : qsTr("▴ More")
+                focusPolicy: Qt.NoFocus
+                implicitHeight: window.compact ? 30 : 36
+                font.pixelSize: window.compact ? 11 : 13
+                onClicked: window.expanded = !window.expanded
+            }
+        }
 
-            Row {
-                spacing: window.compact ? 0 : 4
-                Repeater {
-                    // kind: "synth" = alleen voor de eigen synth, "wt" = alleen bij een wavetable,
-                    // "all" = ook voor de gesamplede instrumenten.
+        StackLayout {
+            id: panels
+            currentIndex: window.panel
+            Layout.fillWidth: true
+            Layout.fillHeight: false   // geneste layouts vullen standaard; het toetsenbord krijgt de rest
+            Layout.preferredHeight: window.panelHeight
+            Layout.maximumHeight: window.panelHeight
+
+            // 0: Synth - golfvorm, knoppen en oscilloscoop.
+            RowLayout {
+                spacing: window.compact ? 8 : 16
+
+                ColumnLayout {
+                    spacing: 2
+                    Layout.alignment: Qt.AlignTop
+                    enabled: synth.synthControlsEnabled
+                    opacity: enabled ? 1 : 0.35
+                    Label { text: qsTr("Wave"); opacity: 0.75; font.pixelSize: 11 }
+                    // Vier klassieke golfvormen en zes wavetables (Analog, Harmonics, PWM, Sync, Formant, Fold).
+                    ComboBox {
+                        Layout.preferredWidth: window.compact ? 118 : 140
+                        model: synth.waveformNames
+                        currentIndex: synth.waveform
+                        focusPolicy: Qt.NoFocus
+                        onActivated: (index) => synth.waveform = index
+                    }
+                }
+
+                KnobStrip {
+                    Layout.alignment: Qt.AlignTop
+                    engine: window.engine
+                    compact: window.compact
+                    synthEnabled: window.engine.synthControlsEnabled
+                    wavetableEnabled: window.engine.waveformIsWavetable
                     model: [
-                        { param: "attack", label: qsTr("Attack"), from: 0.001, to: 2, log: true, unit: " s", dec: 2, kind: "synth" },
-                        { param: "decay", label: qsTr("Decay"), from: 0.01, to: 2, log: true, unit: " s", dec: 2, kind: "synth" },
-                        { param: "sustain", label: qsTr("Sustain"), from: 0, to: 1, log: false, unit: "", dec: 2, kind: "synth" },
-                        { param: "release", label: qsTr("Release"), from: 0.01, to: 3, log: true, unit: " s", dec: 2, kind: "synth" },
-                        { param: "position", label: qsTr("Position"), from: 0, to: 1, log: false, unit: "", dec: 2, kind: "wt" },
+                        { param: "attack", label: qsTr("Attack"), from: 0.001, to: 2, log: true, unit: " s", kind: "synth" },
+                        { param: "decay", label: qsTr("Decay"), from: 0.01, to: 2, log: true, unit: " s", kind: "synth" },
+                        { param: "sustain", label: qsTr("Sustain"), from: 0, to: 1, kind: "synth" },
+                        { param: "release", label: qsTr("Release"), from: 0.01, to: 3, log: true, unit: " s", kind: "synth" },
+                        { param: "position", label: qsTr("Position"), from: 0, to: 1, kind: "wt" },
                         { param: "cutoff", label: qsTr("Cutoff"), from: 100, to: 12000, log: true, unit: " Hz", dec: 0, kind: "synth" },
-                        { param: "resonance", label: qsTr("Reso"), from: 0, to: 1, log: false, unit: "", dec: 2, kind: "synth" },
+                        { param: "resonance", label: qsTr("Reso"), from: 0, to: 1, kind: "synth" },
                         { param: "drive", label: qsTr("Drive"), from: 1, to: 10, log: true, unit: "x", dec: 1, kind: "synth" },
-                        { param: "envmod", label: qsTr("Env→Filt"), from: 0, to: 1, log: false, unit: "", dec: 2, kind: "synth" },
-                        { param: "volume", label: qsTr("Volume"), from: 0, to: 1, log: false, unit: "", dec: 2, kind: "all" }
+                        { param: "envmod", label: qsTr("Env→Filt"), from: 0, to: 1, kind: "synth" },
+                        { param: "volume", label: qsTr("Volume"), from: 0, to: 1 }
                     ]
-                    Knob {
-                        required property var modelData
-                        width: window.compact ? 52 : 64
-                        dialSize: window.compact ? 38 : 56
-                        compact: window.compact
-                        synth: window.engine
-                        paramName: modelData.param
-                        label: modelData.label
-                        from: modelData.from
-                        to: modelData.to
-                        logarithmic: modelData.log
-                        unit: modelData.unit
-                        decimals: modelData.dec
-                        enabled: modelData.kind === "all"
-                                 || (window.engine.synthControlsEnabled
-                                     && (modelData.kind === "synth" || window.engine.waveformIsWavetable))
-                        opacity: enabled ? 1 : 0.35
+                }
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    Layout.minimumWidth: 100
+                    radius: 8
+                    color: "#0f1014"
+                    border.color: "#2b2d36"
+                    clip: true
+                    WaveformView {
+                        anchors.fill: parent
+                        anchors.margins: 2
+                        synth: synth
+                        lineColor: window.Material.accent
                     }
                 }
             }
 
-            Button {
-                text: qsTr("Reverb")
-                Layout.preferredWidth: window.compact ? 78 : 92
-                highlighted: reverbPanel.opened
-                focusPolicy: Qt.NoFocus
-                onClicked: reverbPanel.open()
+            // 1: Effects - echo en galm, voor elk instrument.
+            RowLayout {
+                spacing: window.compact ? 6 : 14
+
+                ColumnLayout {
+                    spacing: 0
+                    Layout.alignment: Qt.AlignTop
+                    Label { text: qsTr("Delay"); font.bold: true; font.pixelSize: 12 }
+                    Switch {
+                        id: syncSwitch
+                        text: qsTr("Sync")
+                        focusPolicy: Qt.NoFocus
+                        checked: window.patchRevision >= 0 && synth.param("delay_sync") >= 0.5
+                        onToggled: synth.setParam("delay_sync", checked ? 1 : 0)
+                        font.pixelSize: 11
+                        implicitHeight: 32
+                    }
+                    // Gesynchroniseerd: kies een notenwaarde; de tijd volgt het sequencer-tempo.
+                    ComboBox {
+                        visible: syncSwitch.checked
+                        Layout.preferredWidth: window.compact ? 86 : 100
+                        implicitHeight: window.compact ? 34 : 40
+                        focusPolicy: Qt.NoFocus
+                        readonly property var beats: [0.25, 0.5, 0.75, 1, 1.5, 2]
+                        model: ["1/16", "1/8", "1/8 .", "1/4", "1/4 .", "1/2"]
+                        currentIndex: window.patchRevision >= 0 ? Math.max(0, beats.indexOf(synth.param("delay_beats"))) : 0
+                        onActivated: (index) => synth.setParam("delay_beats", beats[index])
+                    }
+                }
+                KnobStrip {
+                    Layout.alignment: Qt.AlignTop
+                    engine: window.engine
+                    compact: window.compact
+                    model: syncSwitch.checked
+                           ? [
+                               { param: "delay_mix", label: qsTr("Mix"), from: 0, to: 1 },
+                               { param: "delay_feedback", label: qsTr("Feedback"), from: 0, to: 0.95 },
+                               { param: "delay_tone", label: qsTr("Tone"), from: 500, to: 12000, log: true, unit: " Hz", dec: 0 }
+                           ]
+                           : [
+                               { param: "delay_time", label: qsTr("Time"), from: 0.02, to: 2, log: true, unit: " s" },
+                               { param: "delay_mix", label: qsTr("Mix"), from: 0, to: 1 },
+                               { param: "delay_feedback", label: qsTr("Feedback"), from: 0, to: 0.95 },
+                               { param: "delay_tone", label: qsTr("Tone"), from: 500, to: 12000, log: true, unit: " Hz", dec: 0 }
+                           ]
+                }
+                Rectangle { width: 1; Layout.fillHeight: true; color: "#2b2d36" }
+                Label { text: qsTr("Reverb"); font.bold: true; font.pixelSize: 12; Layout.alignment: Qt.AlignTop }
+                KnobStrip {
+                    Layout.alignment: Qt.AlignTop
+                    engine: window.engine
+                    compact: window.compact
+                    model: [
+                        { param: "reverb", label: qsTr("Mix"), from: 0, to: 1 },
+                        { param: "reverb_predelay", label: qsTr("Predelay"), from: 0, to: 0.25, unit: " s" },
+                        { param: "reverb_decay", label: qsTr("Decay"), from: 0, to: 1 },
+                        { param: "reverb_damp", label: qsTr("Damping"), from: 0, to: 1 },
+                        { param: "reverb_lowcut", label: qsTr("Low cut"), from: 20, to: 1000, log: true, unit: " Hz", dec: 0 },
+                        { param: "reverb_highcut", label: qsTr("High cut"), from: 1000, to: 16000, log: true, unit: " Hz", dec: 0 }
+                    ]
+                }
+                Item { Layout.fillWidth: true }
             }
 
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                Layout.minimumWidth: 120
-                radius: 8
-                color: "#0f1014"
-                border.color: "#2b2d36"
-                clip: true
-                WaveformView {
-                    anchors.fill: parent
-                    anchors.margins: 2
-                    synth: synth
-                    lineColor: window.Material.accent
-                }
+            // 2: Sequencer.
+            SequencerPanel {
+                engine: window.engine
+                compact: window.compact
+                expanded: window.expanded
             }
         }
 

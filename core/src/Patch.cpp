@@ -16,7 +16,11 @@ Patch::Patch() : name_("Init"), waveform_(dsp::Waveform::Analog) {
                              Param("reverb", 0.0f, 1.0f, 0.25f), Param("reverb_predelay", 0.0f, 0.25f, 0.02f),
                              Param("reverb_decay", 0.0f, 1.0f, 0.6f), Param("reverb_damp", 0.0f, 1.0f, 0.3f),
                              Param("reverb_lowcut", 20.0f, 1000.0f, 150.0f),
-                             Param("reverb_highcut", 1000.0f, 16000.0f, 7000.0f)}) {
+                             Param("reverb_highcut", 1000.0f, 16000.0f, 7000.0f),
+                             // Echo: mix, tijd (s) of tempo-sync in tellen, feedback, toon.
+                             Param("delay_mix", 0.0f, 1.0f, 0.0f), Param("delay_time", 0.02f, 2.0f, 0.375f),
+                             Param("delay_sync", 0.0f, 1.0f, 1.0f), Param("delay_beats", 0.125f, 2.0f, 0.75f),
+                             Param("delay_feedback", 0.0f, 0.95f, 0.4f), Param("delay_tone", 500.0f, 12000.0f, 4000.0f)}) {
     params_.emplace(param.name(), param);
   }
 }

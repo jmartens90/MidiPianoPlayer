@@ -25,6 +25,8 @@ qt_add_qml_module(MidiPianoPlayer
     qml/Main.qml
     qml/PianoKeyboard.qml
     qml/Knob.qml
+    qml/KnobStrip.qml
+    qml/SequencerPanel.qml
   SOURCES
     SynthController.h
     SynthController.cpp

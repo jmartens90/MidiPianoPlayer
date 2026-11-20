@@ -24,12 +24,19 @@ plays the same kind of pattern.
 * A demo sequencer running on its own thread. Its notes light up on the keyboard.
 * Low-latency audio through [miniaudio](https://miniaud.io): WASAPI, Core Audio, PulseAudio/ALSA or AAudio.
 * Bluetooth LE MIDI input: search and connect from the settings panel, then play from the PSoC 6 or any BLE MIDI device.
+* Three panels, Synth, Effects and Sequencer, that you switch with tabs. **▴ More** makes the panel
+  big (the keyboard gets smaller), like the hidden advanced section of an Arturia synth.
+* A 16-step sequencer: tempo, gate, swing, accents, and a note grid in the big view. It plays on its
+  own thread with drift-free timing.
+* A delay (echo) with feedback, tone and tempo sync (1/16 to 1/2, dotted values too).
 * A sustain pedal (button, space bar or MIDI CC 64) and a Freeverb-style reverb that works on every instrument.
 * On Android the app always runs in landscape, with a compact control bar so the keyboard gets the most room.
 
 ![Phone, landscape](docs/images/phone-landscape.png)
 
-![Reverb panel](docs/images/reverb-panel.png)
+![Effects panel](docs/images/effects.png)
+
+![Sequencer, big view](docs/images/sequencer.png)
 
 ![Settings with Bluetooth MIDI](docs/images/settings.png)
 
@@ -117,7 +124,10 @@ several messages per packet, realtime bytes and SysEx.
 | Reso | (Synth only) Filter resonance: a whistling peak at the cutoff; at the top the filter sings by itself |
 | Drive | (Synth only) Pushes the filter into saturation for a dirtier sound |
 | Env→Filt | (Synth only) How far the envelope opens the filter on every note (the "acid" squelch) |
-| Reverb | Opens the reverb panel: Mix, Predelay, Decay, Damping, Low cut (pre-filter on the reverb input) and High cut (post-filter on the reverb output) |
+| Synth / Effects / Sequencer | Tabs above the knobs. **▴ More** / **▾ Less** makes the panel big or small |
+| Delay (Effects) | Mix, Feedback, Tone, and Time, or with **Sync** on a note value that follows the sequencer tempo |
+| Reverb (Effects) | Mix, Predelay, Decay, Damping, Low cut (pre-filter on the reverb input) and High cut (post-filter on the reverb output) |
+| Sequencer | Play/Stop, Tempo, Gate, Swing. Tap a step to switch it on or off. In the big view, tap a cell to put that note on that step, and use the bottom row for accents; Octave −/+ moves the grid, Clear and Reset change the whole pattern |
 | Volume | Master volume |
 | Pedal | Sustain pedal: released notes keep ringing until you turn it off. On a PC you can also hold the space bar |
 | Octave − / + | Shift the keyboard from C0 to C6 |
@@ -223,6 +233,19 @@ classDiagram
         +addInstrument(unique_ptr~Instrument~)
         +selectInstrument(index)
         +applyPatch(const Patch&)
+    }
+    class Delay {
+        -vector~float~ line_
+        -float currentDelay_
+        +setSettings(const Settings&)
+        +process(float*, frames)
+    }
+    class StepSequencer {
+        -array~Step,16~ pattern_
+        -thread thread_
+        -atomic~float~ bpm_
+        +setStep(index, Step)
+        +currentStep() int
     }
     class Reverb {
         -Settings settings_
@@ -366,6 +389,9 @@ classDiagram
     Synth *-- Patch
     Synth *-- RingBuffer
     Synth *-- Reverb
+    Synth *-- Delay
+    MidiSource <|-- StepSequencer
+    SynthController *-- StepSequencer
     Synth ..> MidiMessage : handle()
     SynthController ..> SoundFont : loads instruments.sf2
     Voice *-- Oscillator

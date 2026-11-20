@@ -5,6 +5,7 @@
 #include <QString>
 #include <QStringList>
 #include <QTimer>
+#include <QVariantList>
 #include <QtQml/qqmlregistration.h>
 
 #include <memory>
@@ -14,6 +15,7 @@
 #include "midipiano/audio/AudioOutput.h"
 #include "midipiano/dsp/Synth.h"
 #include "midipiano/midi/MidiSource.h"
+#include "midipiano/midi/StepSequencer.h"
 #include "midipiano/preset/PresetStore.h"
 
 namespace midipiano::app {
@@ -40,6 +42,10 @@ class SynthController : public QObject {
   Q_PROPERTY(bool sustain READ sustain WRITE setSustain NOTIFY sustainChanged)
   Q_PROPERTY(BleMidiSource* bluetooth READ bluetooth CONSTANT)
   Q_PROPERTY(QString audioInfo READ audioInfo CONSTANT)
+  // Step sequencer: de stappen (lijst van {active, note, accent}), afspelen en de huidige stap.
+  Q_PROPERTY(QVariantList steps READ steps NOTIFY stepsChanged)
+  Q_PROPERTY(bool stepSequencerRunning READ stepSequencerRunning NOTIFY stepSequencerRunningChanged)
+  Q_PROPERTY(int currentStep READ currentStep NOTIFY currentStepChanged)
 
  public:
   explicit SynthController(QObject* parent = nullptr);
@@ -53,6 +59,10 @@ class SynthController : public QObject {
   Q_INVOKABLE void toggleSequencer();
   Q_INVOKABLE void savePreset(const QString& name);
   Q_INVOKABLE void loadPreset(const QString& name);
+  Q_INVOKABLE void toggleStepSequencer();
+  Q_INVOKABLE void setStep(int index, bool active, int note, bool accent);
+  Q_INVOKABLE void clearSteps();
+  Q_INVOKABLE void resetSteps();
 
   int waveform() const;
   void setWaveform(int waveform);
@@ -70,6 +80,9 @@ class SynthController : public QObject {
   bool sustain() const { return synth_.sustain(); }
   BleMidiSource* bluetooth() const { return bluetooth_.get(); }
   QString audioInfo() const;
+  QVariantList steps() const;
+  bool stepSequencerRunning() const { return stepSequencer_->isRunning(); }
+  int currentStep() const { return currentStep_; }
   void setSustain(bool down);
 
   void copyScope(std::vector<float>& out) const { synth_.scopeSnapshot(out); }
@@ -82,6 +95,9 @@ class SynthController : public QObject {
   void statusTextChanged();
   void instrumentChanged();
   void sustainChanged();
+  void stepsChanged();
+  void stepSequencerRunningChanged();
+  void currentStepChanged();
   void noteStateChanged(int note, bool on);  // noten van de sequencer, om toetsen te laten oplichten
   void scopeUpdated();
 
@@ -102,6 +118,8 @@ class SynthController : public QObject {
   // verder), en source_ wijst naar een MidiSource: nu de DemoSequencer, later de BLE-bron.
   std::unique_ptr<audio::AudioOutput> audio_;
   std::unique_ptr<midi::MidiSource> source_;
+  std::unique_ptr<midi::StepSequencer> stepSequencer_;
+  int currentStep_ = -1;
   // Tweede MIDI-bron: Bluetooth (de PSoC 6). Na synth_ gedeclareerd, dus eerder afgebroken.
   std::unique_ptr<BleMidiSource> bluetooth_;
   std::unique_ptr<preset::PresetStore> store_;

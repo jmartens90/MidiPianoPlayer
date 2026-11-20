@@ -2,7 +2,9 @@
 add_library(midipiano_core STATIC
   src/AudioOutput.cpp
   src/BleMidiParser.cpp
+  src/Delay.cpp
   src/DemoSequencer.cpp
+  src/StepSequencer.cpp
   src/Envelope.cpp
   src/LowPassFilter.cpp
   src/MidiMessage.cpp

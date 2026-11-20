@@ -20,6 +20,7 @@ std::uint8_t toMidiByte(int value) { return static_cast<std::uint8_t>(std::clamp
 SynthController::SynthController(QObject* parent)
     : QObject(parent),
       source_(std::make_unique<midi::DemoSequencer>()),
+      stepSequencer_(std::make_unique<midi::StepSequencer>()),
       bluetooth_(std::make_unique<BleMidiSource>()),
       tick_(new QTimer(this)) {
   // new QTimer(this): de controller is de Qt-parent, dus Qt verwijdert de timer automatisch samen
@@ -58,11 +59,50 @@ SynthController::SynthController(QObject* parent)
 }
 
 SynthController::~SynthController() {
+  stepSequencer_->stop();
   if (source_) source_->stop();  // eerst de sequencer-thread stoppen, dan pas de synth afbreken
+}
+
+QVariantList SynthController::steps() const {
+  QVariantList list;
+  for (const auto& step : stepSequencer_->pattern()) {
+    list.append(QVariantMap{{"active", step.active}, {"note", int(step.note)}, {"accent", step.accent}});
+  }
+  return list;
+}
+
+void SynthController::toggleStepSequencer() {
+  if (stepSequencer_->isRunning()) {
+    stepSequencer_->stop();
+  } else {
+    synth_.setTempo(stepSequencer_->bpm());
+    stepSequencer_->start([this](const midi::MidiMessage& message) { onSourceMessage(message); });
+  }
+  emit stepSequencerRunningChanged();
+}
+
+void SynthController::setStep(int index, bool active, int note, bool accent) {
+  if (index < 0 || index >= static_cast<int>(midi::StepSequencer::kSteps)) return;
+  stepSequencer_->setStep(static_cast<std::size_t>(index), {active, toMidiByte(note), accent});
+  emit stepsChanged();
+}
+
+void SynthController::clearSteps() {
+  stepSequencer_->clear();
+  emit stepsChanged();
+}
+
+void SynthController::resetSteps() {
+  stepSequencer_->setPattern(midi::StepSequencer::defaultPattern());
+  emit stepsChanged();
 }
 
 void SynthController::onApplicationStateChanged(Qt::ApplicationState state) {
   if (state == Qt::ApplicationSuspended || state == Qt::ApplicationHidden) {
+    if (stepSequencer_->isRunning()) {
+      stepSequencer_->stop();
+      emit stepSequencerRunningChanged();
+    }
     if (source_ && source_->isRunning()) {
       source_->stop();
       emit sequencerRunningChanged();
@@ -119,6 +159,10 @@ void SynthController::setSustain(bool down) {
 }
 
 double SynthController::param(const QString& name) const {
+  // "seq_"-namen horen bij de step sequencer, niet bij de klank (zo werken dezelfde draaiknoppen).
+  if (name == QLatin1String("seq_bpm")) return stepSequencer_->bpm();
+  if (name == QLatin1String("seq_gate")) return stepSequencer_->gate();
+  if (name == QLatin1String("seq_swing")) return stepSequencer_->swing();
   try {
     return synth_.patch().get(name.toStdString());
   } catch (const std::out_of_range&) {
@@ -127,6 +171,19 @@ double SynthController::param(const QString& name) const {
 }
 
 void SynthController::setParam(const QString& name, double value) {
+  if (name.startsWith(QLatin1String("seq_"))) {
+    const auto v = static_cast<float>(value);
+    if (name == QLatin1String("seq_bpm")) {
+      stepSequencer_->setBpm(v);
+      synth_.setTempo(stepSequencer_->bpm());  // de echo volgt het tempo
+    } else if (name == QLatin1String("seq_gate")) {
+      stepSequencer_->setGate(v);
+    } else if (name == QLatin1String("seq_swing")) {
+      stepSequencer_->setSwing(v);
+    }
+    emit patchChanged();
+    return;
+  }
   preset::Patch patch = synth_.patch();
   try {
     patch.set(name.toStdString(), static_cast<float>(value));
@@ -231,6 +288,11 @@ void SynthController::onTick() {
   if (voices != activeVoices_) {
     activeVoices_ = voices;
     emit activeVoicesChanged();
+  }
+  const int step = stepSequencer_->currentStep();
+  if (step != currentStep_) {
+    currentStep_ = step;
+    emit currentStepChanged();
   }
   emit scopeUpdated();
 }

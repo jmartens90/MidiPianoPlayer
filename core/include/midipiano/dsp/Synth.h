@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 
+#include "midipiano/dsp/Delay.h"
 #include "midipiano/dsp/Instrument.h"
 #include "midipiano/dsp/Reverb.h"
 #include "midipiano/midi/MidiMessage.h"
@@ -46,6 +47,9 @@ class Synth {
   void setSustain(bool down);
   bool sustain() const;
 
+  // Tempo (van de step sequencer): de echo kan erop synchroniseren (delay_sync, delay_beats in tellen).
+  void setTempo(float bpm);
+
   void render(float* out, std::size_t frames);
   void render(std::vector<float>& buffer);
 
@@ -66,6 +70,7 @@ class Synth {
 
  private:
   void applyReverbSettings();  // patch_ -> reverb_ (mutex moet al vast zijn)
+  void applyDelaySettings();   // patch_ + tempo_ -> delay_
 
   mutable std::mutex mutex_;
   std::vector<std::unique_ptr<Instrument>> instruments_;
@@ -73,7 +78,9 @@ class Synth {
   preset::Patch patch_;
   float sampleRate_;
   std::vector<float> scratch_;
+  Delay delay_;
   Reverb reverb_;
+  float tempo_ = 120.0f;
   bool sustain_ = false;
   std::bitset<128> sustained_;  // noten die losgelaten zijn maar door het pedaal blijven klinken
   util::RingBuffer<float> scope_{kScopeSize};

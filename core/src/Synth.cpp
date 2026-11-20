@@ -7,10 +7,11 @@
 
 namespace midipiano::dsp {
 
-Synth::Synth(float sampleRate) : sampleRate_(sampleRate), reverb_(sampleRate) {
+Synth::Synth(float sampleRate) : sampleRate_(sampleRate), delay_(sampleRate), reverb_(sampleRate) {
   instruments_.push_back(std::make_unique<VoiceSynth>(sampleRate));  // instrument 0: de synth
   scratch_.resize(4096);
   applyReverbSettings();
+  applyDelaySettings();
 }
 
 void Synth::handle(const midi::MidiMessage& message) {
@@ -77,6 +78,7 @@ void Synth::render(float* out, std::size_t frames) {
     instrument->render(scratch_.data(), frames);
     for (std::size_t i = 0; i < frames; ++i) out[i] += scratch_[i];
   }
+  delay_.process(out, frames);    // echo voor de galm: de echo's krijgen ook galm
   reverb_.process(out, frames);  // ook als er geen noten meer zijn: dan sterft de galm uit
   const float volume = patch_.get("volume");
   for (std::size_t i = 0; i < frames; ++i) {
@@ -98,6 +100,7 @@ void Synth::scopeSnapshot(std::vector<float>& out) const {
 void Synth::setSampleRate(float sampleRate) {
   std::lock_guard<std::mutex> lock(mutex_);
   sampleRate_ = sampleRate;
+  delay_.setSampleRate(sampleRate);
   reverb_.setSampleRate(sampleRate);
   for (const auto& instrument : instruments_) instrument->setSampleRate(sampleRate);
 }
@@ -146,6 +149,7 @@ void Synth::applyPatch(const preset::Patch& patch) {
   std::lock_guard<std::mutex> lock(mutex_);
   patch_ = patch;
   applyReverbSettings();
+  applyDelaySettings();
   // Vereiste 38: 38.at least 4 useful const references for variables (1/4)
   // instrument is een const-referentie naar elke unique_ptr in de vector: een unique_ptr kan je niet
   // kopieren, en const garandeert dat we de lijst zelf hier niet wijzigen.
@@ -161,6 +165,23 @@ void Synth::applyReverbSettings() {
   settings.lowCutHz = patch_.get("reverb_lowcut");
   settings.highCutHz = patch_.get("reverb_highcut");
   reverb_.setSettings(settings);
+}
+
+void Synth::setTempo(float bpm) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  tempo_ = std::max(bpm, 1.0f);
+  applyDelaySettings();
+}
+
+void Synth::applyDelaySettings() {
+  dsp::Delay::Settings settings;
+  settings.mix = patch_.get("delay_mix");
+  // Gesynchroniseerd: tijd = aantal tellen x lengte van een tel (60 / BPM). 0,75 tel = gepunteerde achtste.
+  settings.time = patch_.get("delay_sync") >= 0.5f ? patch_.get("delay_beats") * 60.0f / tempo_
+                                                   : patch_.get("delay_time");
+  settings.feedback = patch_.get("delay_feedback");
+  settings.toneHz = patch_.get("delay_tone");
+  delay_.setSettings(settings);
 }
 
 preset::Patch Synth::patch() const {

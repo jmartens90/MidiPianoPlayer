@@ -27,6 +27,9 @@ them on every push.
 | Samples | `soundfont_loads_the_piano_presets`, `piano_plays_and_stops_through_the_synth`, `instruments_share_one_soundfont` | the SoundFont loads, the piano sounds and stops, instruments share one font |
 | Effects | `sustain_pedal_*`, `reverb_*`, `resonant_filter_rings_and_can_self_oscillate` | pedal holds notes, reverb tail and predelay, filter self-oscillates at full resonance |
 | Wavetables | `wavetable_morphs_and_avoids_aliasing`, `every_wavetable_waveform_plays_through_a_voice` | Position morphs, high notes use a band-limited table, every table sounds |
+| Delay | `delay_repeats_the_sound_at_the_right_time`, `delay_syncs_to_the_sequencer_tempo` | echoes arrive at the set time and get softer; sync uses the tempo |
+| Step sequencer | `step_sequencer_plays_active_steps_in_time` | only active steps play, accent = velocity 127, transpose works, stop is immediate |
+| Hanging notes | `restruck_piano_note_never_hangs`, `switching_instrument_releases_held_notes` | a key struck twice (pedal, sequencer) never keeps sounding |
 | Bluetooth | `ble_parser_*` (4 tests) | BLE MIDI packets: several messages, running status (also across packets), realtime and SysEx skipped, bad packets ignored |
 
 ## By hand: app checklist
@@ -53,3 +56,7 @@ Do this on the desktop build and on an Android phone.
 | 16 | Tap the device, then play notes on it | Status shows "Connected to ...", notes sound and light up, the message counter rises |
 | 17 | Switch the device off while connected | Status shows "... disconnected", no notes keep hanging |
 | 18 | Search on a PC without Bluetooth | Orange "Bluetooth error: ..." message, the app keeps running |
+| 19 | Sequencer tab → Play, tap steps on and off | Pattern plays, the white frame walks over the steps, changes are heard right away |
+| 20 | ▴ More on the Sequencer tab, tap cells in the grid | The note on that step changes; the bottom row toggles accents |
+| 21 | Effects tab: Delay Mix up, Sync on, 1/8 . | Echoes on the beat of the sequencer tempo; changing Tempo changes the echo |
+| 22 | On Android: press Home while a note or the sequencer plays | Sound stops at once; back in the app, playing works again |
